@@ -31,6 +31,9 @@ public:
     virtual void onUsbState(bool portOpen, bool charging) override;
     virtual void onLowBattery() override {}  // Not called in this screen
     virtual void onBatteryLevel(uint8_t lvl) override;
+    virtual void onTime(uint8_t h, uint8_t m, uint8_t s) override;
+    virtual void onDate(uint8_t m, uint8_t d, uint8_t wd) override;
+    virtual void onLocalSettings(const WatchSettingsLocal &sett) override;
     virtual void onAppStartReq(uint32_t pid) override {}  // Not called in this screen
     virtual void onAppLaunchFailed() override {}  // Not shown over this screen
 

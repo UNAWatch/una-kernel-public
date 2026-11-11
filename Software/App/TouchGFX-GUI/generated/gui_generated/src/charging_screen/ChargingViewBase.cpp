@@ -17,7 +17,7 @@ ChargingViewBase::ChargingViewBase()
     progress.setXY(0, 0);
     add(progress);
 
-    value.setPosition(72, 122, 96, 38);
+    value.setPosition(72, 158, 96, 38);
     value.setColor(touchgfx::Color::getColorFromRGB(0, 128, 128));
     value.setLinespacing(0);
     Unicode::snprintf(valueBuffer, VALUE_SIZE, "%s", touchgfx::TypedText(T___SINGLEUSE_P0WH).getText());
@@ -25,14 +25,16 @@ ChargingViewBase::ChargingViewBase()
     value.setTypedText(touchgfx::TypedText(T_TMP_SEMIBOLD_30));
     add(value);
 
-    text.setXY(49, 84);
+    text.setPosition(50, 140, 140, 24);
     text.setColor(touchgfx::Color::getColorFromRGB(192, 192, 192));
     text.setLinespacing(0);
     Unicode::snprintf(textBuffer, TEXT_SIZE, "%s", touchgfx::TypedText(T_TEXT_CHARGING).getText());
     text.setWildcard(textBuffer);
-    text.resizeToCurrentText();
-    text.setTypedText(touchgfx::TypedText(T_TMP_SEMIBOLD_30));
+    text.setTypedText(touchgfx::TypedText(T_TMP_MEDIUM_18));
     add(text);
+
+    clock.setXY(23, 60);
+    add(clock);
 }
 
 ChargingViewBase::~ChargingViewBase()
@@ -43,6 +45,7 @@ ChargingViewBase::~ChargingViewBase()
 void ChargingViewBase::setupScreen()
 {
     progress.initialize();
+    clock.initialize();
     transitionBegins();
 }
 

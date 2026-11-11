@@ -37,3 +37,28 @@ void ChargingView::setBatteryLevel(uint8_t level)
 
     progress.setProgress(static_cast<float>(level));
 }
+
+void ChargingView::setTime(uint8_t h, uint8_t m, uint8_t s)
+{
+    // The time comes every second but the clock shows no seconds: redraw it
+    // only when the minute changes.
+    if (h == mHour && m == mMinute) {
+        return;
+    }
+    mHour   = h;
+    mMinute = m;
+    clock.setTime(h, m, s);
+}
+
+void ChargingView::setDate(uint8_t m, uint8_t d, uint8_t wd)
+{
+    clock.setDate(m, d, wd);
+}
+
+void ChargingView::setClockSettings(const WatchSettingsLocal::Clock &settings)
+{
+    // As on the home screen (WatchFace1).
+    clock.setFormat(settings.format);
+    clock.setSeconds(settings.seconds);
+    clock.setDateOrder(settings.dateOrder);
+}

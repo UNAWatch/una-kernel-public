@@ -765,7 +765,7 @@
             "Type": "TextArea",
             "Name": "value",
             "X": 72,
-            "Y": 122,
+            "Y": 158,
             "Width": 96,
             "Height": 38,
             "LockPosition": true,
@@ -784,24 +784,32 @@
           {
             "Type": "TextArea",
             "Name": "text",
-            "X": 49,
-            "Y": 84,
-            "Width": 143,
-            "Height": 38,
+            "X": 50,
+            "Y": 140,
+            "Width": 140,
+            "Height": 24,
             "LockPosition": true,
-            "TextId": "TMP_SEMIBOLD_30",
+            "TextId": "TMP_MEDIUM_18",
             "TextRotation": "0",
             "Color": {
               "Red": 192,
               "Green": 192,
               "Blue": 192
             },
-            "AutoSize": true,
             "Wildcard1": {
               "TextId": "TEXT_CHARGING",
               "UseBuffer": true,
               "BufferSize": 10
             }
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "clock",
+            "X": 23,
+            "Y": 60,
+            "Width": 194,
+            "Height": 77,
+            "CustomContainerDefinitionName": "ClockHome"
           }
         ],
         "Interactions": [

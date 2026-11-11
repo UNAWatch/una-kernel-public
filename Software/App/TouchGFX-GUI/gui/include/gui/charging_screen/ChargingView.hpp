@@ -13,9 +13,16 @@ public:
     virtual void tearDownScreen();
 
     void setBatteryLevel(uint8_t level);
+    void setTime(uint8_t h, uint8_t m, uint8_t s);
+    void setDate(uint8_t m, uint8_t d, uint8_t wd);
+    void setClockSettings(const WatchSettingsLocal::Clock &settings);
 
 protected:
     virtual void handleKeyEvent(uint8_t key) override;
+
+private:
+    uint8_t mHour   = 0xFF;
+    uint8_t mMinute = 0xFF;
 };
 
 #endif // CHARGINGVIEW_HPP

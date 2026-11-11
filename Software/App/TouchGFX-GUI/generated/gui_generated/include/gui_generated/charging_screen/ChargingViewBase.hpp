@@ -10,6 +10,7 @@
 #include <touchgfx/widgets/Box.hpp>
 #include <gui/containers/ProgressBar.hpp>
 #include <touchgfx/widgets/TextAreaWithWildcard.hpp>
+#include <gui/containers/ClockHome.hpp>
 
 class ChargingViewBase : public touchgfx::View<ChargingPresenter>
 {
@@ -31,6 +32,7 @@ protected:
     ProgressBar progress;
     touchgfx::TextAreaWithOneWildcard value;
     touchgfx::TextAreaWithOneWildcard text;
+    ClockHome clock;
 
     /*
      * Wildcard Buffers
