@@ -108,6 +108,12 @@ bool HrTracker::isValidLastMinute(uint32_t nowMs) const
     return false;
 }
 
+bool HrTracker::hasRecentValidSample(uint32_t nowMs) const
+{
+    if (mLastValidTsMs == 0) return false;
+    return (nowMs - mLastValidTsMs) <= skMaxAgeMs;
+}
+
 float HrTracker::avgLastMinute() const
 {
     if (mWindow.empty())     return 0.0f;

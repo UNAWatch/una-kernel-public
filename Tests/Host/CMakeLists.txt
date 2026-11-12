@@ -39,6 +39,7 @@ set(KERNEL_LIB_SOURCES
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/External/Magnetometer/MagSphereFit.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/Activity/Features/MotionTracker.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/Activity/Features/ActivityTracker.cpp"
+    "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/Activity/Features/HrTracker.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/ChargeThermalMonitor.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/ErrorArbiter.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/External/BLE/EventRouter.cpp"
@@ -144,6 +145,7 @@ add_executable(una-host-tests
     kernel/PhoneNotification_test.cpp
     kernel/GuardPath_test.cpp
     kernel/HrSourceArbiter_test.cpp
+    kernel/HrTracker_test.cpp
     kernel/ImuFifoLatency_test.cpp
     kernel/ImuTimeBase_test.cpp
     kernel/LatencyAggregate_test.cpp

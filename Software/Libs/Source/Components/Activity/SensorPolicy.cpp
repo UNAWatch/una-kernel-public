@@ -68,7 +68,15 @@ uint32_t SensorPolicy::activityMinutesSinceBoot() const
 float SensorPolicy::currentAvgHr() const
 {
     OS::MutexCS cs(mDataMutex);
-    return mHr;
+
+    // mHr is only refreshed when an HR frame arrives. Once frames stop
+    // (watch taken off, HR subsensor stopped) it would keep its last value
+    // indefinitely, and DailyHealth books currentAvgHr() into every minute:
+    // a watch left on the bedside table recorded hours of a flat HR, which
+    // then became the day's resting HR. Report "no reading" once the last
+    // valid sample is too old to stand for the present.
+    // Lock order mDataMutex -> FeatureCenter::mMutex, as elsewhere here.
+    return mFeatures.hasRecentHr() ? mHr : 0.0f;
 }
 
 // ============================================================================
