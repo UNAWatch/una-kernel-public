@@ -245,7 +245,7 @@ void Aiding::onAidingRefLocationSave(float lat, float lon, float alt)
         return;
     }
 
-    if (lat < 0.000001 && lon < 0.000001 && alt < 0.000001 ) {
+    if (isUnsetReferenceLocation(lat, lon, alt)) {
         // Mark location as invalid
         mRtc->writeBackupReg(RTC_BRK_REG_GPS_REF_CRC, 0);
         return;
