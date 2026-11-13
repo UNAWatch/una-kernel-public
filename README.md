@@ -27,7 +27,8 @@ Then build it in the same container that UNA's releases are built in:
 
 ```bash
 docker run --rm -v "$PWD:/workspace" xanderhendriks/stm32cubeide:16.0 bash -c \
-    'git config --global --add safe.directory /workspace && \
+    'apt-get update && apt-get install -y git && \
+     git config --global --add safe.directory /workspace && \
      . /workspace/SDK/Utilities/Scripts/build-cube/find-cube.sh && \
      . /workspace/SDK/Utilities/Scripts/build-cube/una-version.sh \
        /workspace/Software/App/UnaWatch-CubeIDE/ && \
@@ -35,7 +36,7 @@ docker run --rm -v "$PWD:/workspace" xanderhendriks/stm32cubeide:16.0 bash -c \
        /workspace/Software/App/UnaWatch-CubeIDE/'
 ```
 
-The files above are written to `Exe/`. The version comes from the release tag that is checked out. After a commit of your own, it is that tag followed by your commit's hash, and `-dirty` if you have uncommitted changes. The build writes the version into `Software/App/UnaWatch-CubeIDE/.settings/org.eclipse.cdt.core.prefs`, which itself counts as a change; restore it with `git checkout -- Software/App/UnaWatch-CubeIDE/.settings` before building again. To set the version yourself, add `-e BUILD_VERSION=<version>` to `docker run`.
+The files above are written to `Exe/`. The version comes from the release tag that is checked out. After a commit of your own, it is that tag followed by your commit's hash, and `-dirty` if you have uncommitted changes. The build writes the version into `Software/App/UnaWatch-CubeIDE/.settings/org.eclipse.cdt.core.prefs` and rewrites `Software/App/UnaWatch-CubeIDE/.project`, and both count as changes; restore them with `git checkout -- Software/App/UnaWatch-CubeIDE/.settings Software/App/UnaWatch-CubeIDE/.project` before building again. To set the version yourself, add `-e BUILD_VERSION=<version>` to `docker run`.
 
 A build of a release tag produces the same `.ota` as that release.
 
