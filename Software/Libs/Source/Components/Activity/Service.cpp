@@ -93,6 +93,18 @@ void Service::thread()
         if (cmd.id == Cmd::Id::FSM_TICK) {
             mFsm.tick();
 
+            // Tell listeners when the watch goes on or comes off the
+            // wrist, as judged by the FSM, so they can stop trusting
+            // wrist-only readings (HR) the moment it comes off.
+            const Fsm::State st = mFsm.current();
+            const bool worn = (st != Fsm::State::IDLE &&
+                               st != Fsm::State::UNWORN);
+            if (worn != mLastWorn) {
+                mLastWorn = worn;
+                mDurationListeners.notify(
+                    &IDurationListener::onWornChanged, worn);
+            }
+
             // Pull the current activity-minute total and notify
             // listeners on this worker thread whenever it advances.
             // ActivityTracker integrates time inside the call, so
