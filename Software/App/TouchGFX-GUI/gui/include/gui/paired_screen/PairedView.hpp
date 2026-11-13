@@ -11,6 +11,7 @@ public:
     virtual ~PairedView() {}
     virtual void setupScreen();
     virtual void tearDownScreen();
+    void showReconnected();
 protected:
     uint16_t mCounter = Gui::Config::kPairedScreenTimeout;
     virtual void handleTickEvent() override;

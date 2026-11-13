@@ -380,7 +380,7 @@ struct DevInfo {
 };
 
 struct BleBond {
-    bool status;
+    uint8_t count;
 };
 struct BleConnect {
     bool status;
@@ -390,6 +390,9 @@ struct BlePinCode {
 };
 struct BlePair {
     bool status;
+};
+// A bonded device reconnected: the link was encrypted without a pin code
+struct BleReconnect {
 };
 
 struct BatteryLevel {
@@ -623,6 +626,7 @@ using Data = std::variant<
         BleConnect,
         BlePinCode,
         BlePair,
+        BleReconnect,
 
         BatteryLevel,
         BatteryCharge,

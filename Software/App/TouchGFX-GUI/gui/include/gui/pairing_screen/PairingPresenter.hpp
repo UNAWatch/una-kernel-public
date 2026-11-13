@@ -32,6 +32,7 @@ public:
     virtual void onBlePinCode() override;
     virtual void onBleConnect(bool connected) override;
     virtual void onBlePair(bool paired) override;
+    virtual void onBleReconnect() override;
 
 private:
     PairingPresenter();

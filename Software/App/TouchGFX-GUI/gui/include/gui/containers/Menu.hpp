@@ -30,6 +30,7 @@ public:
     void showListContent(bool state);
 
     void setInfoMsg(TypedTextId msgId);
+    void setInfoMsg(uint16_t count, TypedTextId msgId);
     void setInfoMsgColor(touchgfx::colortype color);
 
     Buttons &getButtons();

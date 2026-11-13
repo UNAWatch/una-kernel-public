@@ -47,3 +47,8 @@ void PairingCancelPresenter::onBlePair(bool paired)
         }
     }
 }
+
+void PairingCancelPresenter::onBleReconnect()
+{
+    model->application().gotoPairedScreenNoTransition();
+}

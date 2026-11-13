@@ -12,6 +12,7 @@ void SettingsPhone2Presenter::activate()
     // Reset idle timer
     model->resetIdleTimer();
 
+    view.bonded(model->bleGetBondedCount());
     view.connected(model->bleIsConnected());
 }
 
@@ -23,6 +24,11 @@ void SettingsPhone2Presenter::deactivate()
 void SettingsPhone2Presenter::unpair()
 {
     model->bleUnpair();
+}
+
+void SettingsPhone2Presenter::onBleBond(bool paired)
+{
+    view.bonded(model->bleGetBondedCount());
 }
 
 void SettingsPhone2Presenter::onBleConnect(bool connected)

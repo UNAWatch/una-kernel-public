@@ -29,6 +29,7 @@ public:
 
     virtual void onIdleTimeout() override { model->application().gotoHomeScreenNoTransition(); }
 
+    virtual void onBleBond(bool paired) override;
     virtual void onBleConnect(bool connected) override;
 
     void unpair();

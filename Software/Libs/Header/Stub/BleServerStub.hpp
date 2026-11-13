@@ -81,6 +81,8 @@ public:
 
     virtual bool isBonded() override { return false; }
 
+    virtual uint8_t getBondedCount() override { return 0; }
+
     virtual bool startAdvertising() override { return false; }
 
     virtual bool stopAdvertising() override { return false; }

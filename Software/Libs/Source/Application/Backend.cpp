@@ -228,10 +228,10 @@ void Backend::thread()
         // Start BLE monitor timer
         mBleMonitorTimer.start(skBleMonitorPeriodMs);
 
-        sendEventToGui(B2GEvent::BleBond{ble.isBonded()});
+        sendEventToGui(B2GEvent::BleBond{ble.getBondedCount()});
     } else {
 #if 1   // For debug only, just for skip startup screens
-        sendEventToGui(B2GEvent::BleBond{true});
+        sendEventToGui(B2GEvent::BleBond{1});
 #endif
     }
 
@@ -459,7 +459,7 @@ void Backend::bleMonitorTimCallback(void *arg)
         bool isBonded = ble.isBonded();
 
         // Update bond state in GUI
-        sendEventToGui(B2GEvent::BleBond {ble.isBonded()});
+        sendEventToGui(B2GEvent::BleBond {ble.getBondedCount()});
 
         if (isBonded) {
             ble.startAdvertising();
@@ -680,7 +680,7 @@ void Backend::guiHandler(const G2BEvent::BleUnpair &evt)
     Interface::IBle& ble = ComponentFactory::GetInstance().getBle();
     ble.unpair();
     // Update bonding status
-    sendEventToGui(B2GEvent::BleBond{ ble.isBonded() });
+    sendEventToGui(B2GEvent::BleBond{ ble.getBondedCount() });
 }
 
 void Backend::guiHandler(const G2BEvent::BleStartFCC &evt)
@@ -2128,13 +2128,21 @@ void Backend::musicHoldTimCallback(void *arg)
 // BLE
 void Backend::onPinRequest(uint32_t pin)
 {
+    mBlePinRequested = true;
     sendEventToGui(B2GEvent::BlePinCode{pin});
 }
 
 void Backend::onPair(bool state)
 {
     sendEventToGui(B2GEvent::BlePair{state});
-    sendEventToGui(B2GEvent::BleBond{ComponentFactory::GetInstance().getBle().isBonded()});
+    sendEventToGui(B2GEvent::BleBond{ComponentFactory::GetInstance().getBle().getBondedCount()});
+}
+
+void Backend::onEncrypt(bool state)
+{
+    if (state && !mBlePinRequested) {
+        sendEventToGui(B2GEvent::BleReconnect{});
+    }
 }
 
 void Backend::onConnect(const Ble::Address &addr)
@@ -2144,6 +2152,7 @@ void Backend::onConnect(const Ble::Address &addr)
     LOG_DEBUG("onConnect: Address %s\n", addr.toString(tbuff));
 #endif
 
+    mBlePinRequested = false;
     sendEventToGui(B2GEvent::BleConnect{true});
 }
 

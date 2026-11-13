@@ -633,6 +633,11 @@ bool Model::bleIsBonded()
     return mBle.bonded;
 }
 
+uint8_t Model::bleGetBondedCount()
+{
+    return mBle.bondedCount;
+}
+
 bool Model::bleIsConnected()
 {
     return mBle.connected;
@@ -647,6 +652,7 @@ void Model::bleStartPairing()
 {
     mBle.pairingActive = true;
     mBle.manualStart = true; // Pairing initiated by user
+    mBle.reconnected = false;
     mBle.pinCode = 0;
     mBackend.sendEventToBackend(G2BEvent::BleStartPairing {});
 }
@@ -664,6 +670,7 @@ void Model::bleUnpair()
     mBackend.sendEventToBackend(G2BEvent::BleUnpair {});
     // Clean BLE state
     mBle.bonded = false;
+    mBle.bondedCount = 0;
     mBle.connected = false;
     mBle.pairingActive = false;
     mBle.pinCode = 0;
@@ -678,6 +685,11 @@ bool Model::bleIsPairingActive()
 bool Model::bleIsPairingManual()
 {
     return mBle.manualStart;
+}
+
+bool Model::bleIsReconnected()
+{
+    return mBle.reconnected;
 }
 
 void Model::bleStartFCC(const BleChannelsFCC::Info& ch)
@@ -1283,8 +1295,9 @@ void Model::onDataEvent(const B2GEvent::DevInfo &evt)
 
 void Model::onDataEvent(const B2GEvent::BleBond &evt)
 {
-    LOG_DEBUG("BleBond [status = %s]\n", evt.status ? "success" : "fail");
-    mBle.bonded = evt.status;
+    LOG_DEBUG("BleBond [count = %u]\n", evt.count);
+    mBle.bonded = evt.count > 0;
+    mBle.bondedCount = evt.count;
     modelListener->onBleBond(mBle.bonded);
 }
 
@@ -1312,8 +1325,21 @@ void Model::onDataEvent(const B2GEvent::BlePinCode &evt)
 void Model::onDataEvent(const B2GEvent::BlePair &evt)
 {
     LOG_DEBUG("BlePair [status = %s]\n", evt.status ? "success" : "fail");
+    mBle.reconnected = false;
     modelListener->onBlePair(evt.status);
     mBle.pairingActive = false;
+}
+
+void Model::onDataEvent(const B2GEvent::BleReconnect &evt)
+{
+    LOG_DEBUG("BleReconnect\n");
+    if (mBle.pairingActive) {
+        mBle.pairingActive = false;
+        mBle.manualStart = false;
+        mBle.reconnected = true;
+        mBle.pinCode = 0;
+        modelListener->onBleReconnect();
+    }
 }
 
 void Model::onDataEvent(const B2GEvent::BatteryLevel &evt)

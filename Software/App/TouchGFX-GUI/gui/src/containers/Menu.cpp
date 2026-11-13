@@ -94,6 +94,13 @@ void Menu::setInfoMsg(TypedTextId msgId)
     info.invalidate();
 }
 
+void Menu::setInfoMsg(uint16_t count, TypedTextId msgId)
+{
+    Unicode::snprintf(infoBuffer, INFO_SIZE, "%u %s", count, touchgfx::TypedText(msgId).getText());
+    info.setVisible(true);
+    info.invalidate();
+}
+
 void Menu::setInfoMsgColor(touchgfx::colortype color)
 {
     info.setColor(color);

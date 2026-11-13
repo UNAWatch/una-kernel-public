@@ -13,6 +13,7 @@ public:
     virtual void tearDownScreen();
 
     void connected(bool connected);
+    void bonded(uint8_t count);
 
 protected:
     virtual void handleKeyEvent(uint8_t key) override;

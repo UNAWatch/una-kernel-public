@@ -754,6 +754,22 @@ bool PeripheralBlueNRG::isBonded()
     return status;
 }
 
+uint8_t PeripheralBlueNRG::getBondedCount()
+{
+    mCore.lock();
+
+    if (mState < State::ENABLED) {
+        mCore.release();
+        LOG_ERROR("Wrong state [%s]\n", stateToString(mState));
+        return 0;
+    }
+
+    uint8_t count = countBonded();
+
+    mCore.release();
+    return count;
+}
+
 bool PeripheralBlueNRG::startAdvertising()
 {
     bool status { };
@@ -1090,6 +1106,11 @@ bool PeripheralBlueNRG::updateWhitelist()
 
 bool PeripheralBlueNRG::isBondedAtLeastOne()
 {
+    return countBonded() > 0;
+}
+
+uint8_t PeripheralBlueNRG::countBonded()
+{
     uint8_t bondedDeviceNum = 0;
     una_ble_device_address bondedDeviceEntry[skBondedListSize] {};
 
@@ -1099,10 +1120,10 @@ bool PeripheralBlueNRG::isBondedAtLeastOne()
 
     if (status != UNA_BLE_STATUS_SUCCESS) {
         LOG_ERROR("una_ble_gap_get_bonded_devices() failed [0x%02X]\n", status);
-        return false;
+        return 0;
     }
 
-    return bondedDeviceNum > 0;
+    return bondedDeviceNum;
 }
 
 void PeripheralBlueNRG::onConnected(uint16_t connHandle, uint8_t addrType,

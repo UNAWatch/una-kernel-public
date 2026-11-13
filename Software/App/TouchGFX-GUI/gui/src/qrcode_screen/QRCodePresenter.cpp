@@ -47,3 +47,8 @@ void QRCodePresenter::onBlePair(bool paired)
         }
     }
 }
+
+void QRCodePresenter::onBleReconnect()
+{
+    model->application().gotoPairedScreenNoTransition();
+}

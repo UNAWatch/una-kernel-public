@@ -122,6 +122,7 @@ public:
     virtual void onBleBond(bool paired) { }
     virtual void onBleConnect(bool connected) { }
     virtual void onBlePair(bool paired) { }
+    virtual void onBleReconnect() { }
 
     virtual void onCommonSettings(const WatchSettings &sett) { }
     virtual void onLocalSettings(const WatchSettingsLocal &sett) { }

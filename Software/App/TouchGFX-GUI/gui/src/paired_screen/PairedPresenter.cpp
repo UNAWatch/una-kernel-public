@@ -9,7 +9,9 @@ PairedPresenter::PairedPresenter(PairedView& v)
 
 void PairedPresenter::activate()
 {
-
+    if (model->bleIsReconnected()) {
+        view.showReconnected();
+    }
 }
 
 void PairedPresenter::deactivate()

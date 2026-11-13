@@ -133,6 +133,8 @@ private:
 
     bool mEpoSyncState = false;
 
+    bool mBlePinRequested = false;
+
     OS::Thread<Backend, 40*1024> mThread;
 
     Component::RtcAltitudeStorage mAltitudeStorage;
@@ -434,6 +436,7 @@ private:
      // BLE
      virtual void onPinRequest(uint32_t pin) override;
      virtual void onPair(bool state) override;
+     virtual void onEncrypt(bool state) override;
      virtual void onConnect(const Ble::Address &addr) override;
      virtual void onDisconnect(uint8_t reason) override;
      // BLE CurrentTimeService

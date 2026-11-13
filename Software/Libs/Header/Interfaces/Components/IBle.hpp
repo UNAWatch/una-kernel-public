@@ -582,6 +582,12 @@ public:
     virtual bool isBonded() = 0;
 
     /**
+     * @brief   Get the number of bonded devices.
+     * @retval  Number of bonded devices.
+     */
+    virtual uint8_t getBondedCount() = 0;
+
+    /**
      * @brief   Start BLE advertising.
      * @retval  Execution status. 'true' - success, 'false' - otherwise.
      */

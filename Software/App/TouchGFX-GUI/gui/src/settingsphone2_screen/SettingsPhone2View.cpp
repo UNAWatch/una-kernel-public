@@ -10,7 +10,6 @@ void SettingsPhone2View::setupScreen()
     SettingsPhone2ViewBase::setupScreen();
 
     menu.setTitle(T_TEXT_PHONE_UC);
-    menu.setInfoMsg(T_TEXT_PAIRED);
     menu.setInfoMsgColor(Gui::Config::Color::MENU_NOT_SELECTED_TIP_ON);
 
     menu.setNumberOfItems(Gui::Config::Menu::Top::Settings::Phone::ID_COUNT);
@@ -18,19 +17,28 @@ void SettingsPhone2View::setupScreen()
     MenuItemSelected *pS = nullptr;
     MenuItemNotSelected *pN = nullptr;
 
-    // UNPAIR
-    pS = menu.getSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR);
-    pS->config(T_TEXT_UNPAIR);
-
-    pN = menu.getNotSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR);
-    pN->config(T_TEXT_UNPAIR);
-
     // PAIR
     pS = menu.getSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_PAIR);
-    pS->config(T_TEXT_PAIR);
+    pS->config(T_TEXT_PAIR_ANOTHER);
 
     pN = menu.getNotSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_PAIR);
-    pN->config(T_TEXT_PAIR);
+    pN->config(T_TEXT_PAIR_ANOTHER);
+
+    menu.invalidate();
+}
+
+void SettingsPhone2View::bonded(uint8_t count)
+{
+    menu.setInfoMsg(count, count == 1 ? T_TEXT_DEVICE_PAIRED : T_TEXT_DEVICES_PAIRED);
+
+    TypedTextId unpair = count > 1 ? T_TEXT_UNPAIR_ALL : T_TEXT_UNPAIR;
+
+    // UNPAIR
+    MenuItemSelected *pS = menu.getSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR);
+    pS->config(unpair);
+
+    MenuItemNotSelected *pN = menu.getNotSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR);
+    pN->config(unpair);
 
     menu.invalidate();
 }

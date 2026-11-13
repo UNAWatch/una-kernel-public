@@ -224,6 +224,12 @@ public:
     virtual bool isBonded() override;
 
     /**
+     * @brief   Get the number of bonded devices.
+     * @retval  Number of bonded devices.
+     */
+    virtual uint8_t getBondedCount() override;
+
+    /**
      * @brief   Start BLE advertising.
      * @retval  Execution status. 'true' - success, 'false' - otherwise.
      */
@@ -442,6 +448,7 @@ private:
     bool terminate();
     bool updateWhitelist();
     bool isBondedAtLeastOne();
+    uint8_t countBonded();
     // Ble::ILinkClient (the watch's peripheral/phone link owner). The router
     // delivers the slave-role connection and its GATT-client events here; the
     // GATT-client events are forwarded to the blePeripheralClients() coordinator.

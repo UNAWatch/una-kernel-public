@@ -30,6 +30,7 @@ public:
     void onBlePinCode()               override;
     void onBleConnect(bool connected) override;
     void onBlePair(bool paired)       override;
+    void onBleReconnect()             override;
 
     virtual ~QRCodePresenter() {}
 

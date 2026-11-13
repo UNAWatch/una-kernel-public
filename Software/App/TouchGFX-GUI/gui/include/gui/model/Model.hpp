@@ -94,6 +94,7 @@ public:
 
     // BLE
     bool bleIsBonded();
+    uint8_t bleGetBondedCount();
     bool bleIsConnected();
     uint32_t bleGetPinCode();
     void bleStartPairing();
@@ -101,6 +102,7 @@ public:
     void bleUnpair();
     bool bleIsPairingActive();
     bool bleIsPairingManual();
+    bool bleIsReconnected();
     void bleStartFCC(const BleChannelsFCC::Info& ch);
     void bleStopFCC();
 
@@ -384,9 +386,11 @@ protected:
 
     struct {
         bool bonded = false;
+        uint8_t bondedCount = 0;
         bool connected = false;
         bool pairingActive = false;
         bool manualStart = false;
+        bool reconnected = false;
         uint32_t pinCode = 0;
     } mBle {};
 
@@ -559,6 +563,7 @@ protected:
     void onDataEvent(const B2GEvent::BleConnect &evt);
     void onDataEvent(const B2GEvent::BlePinCode &evt);
     void onDataEvent(const B2GEvent::BlePair &evt);
+    void onDataEvent(const B2GEvent::BleReconnect &evt);
     void onDataEvent(const B2GEvent::BatteryLevel &evt);
     void onDataEvent(const B2GEvent::BatteryCharge &evt);
     void onDataEvent(const B2GEvent::ChargingBlocked &evt);

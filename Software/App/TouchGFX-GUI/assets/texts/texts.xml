@@ -855,6 +855,9 @@
         <Translation Language="GB">Waiting for&#10;connection</Translation>
       </Text>
       <Text Id="TEXT_UNPAIR" Alignment="Left" TypographyId="Poppins_Regular_18">
+        <Translation Language="GB">Unpair</Translation>
+      </Text>
+      <Text Id="TEXT_UNPAIR_ALL" Alignment="Left" TypographyId="Poppins_Regular_18">
         <Translation Language="GB">Unpair All</Translation>
       </Text>
       <Text Id="TEXT_PAIRED" Alignment="Left" TypographyId="Poppins_Regular_18">
@@ -862,6 +865,18 @@
       </Text>
       <Text Id="TEXT_PAIR" Alignment="Left" TypographyId="Poppins_Regular_18">
         <Translation Language="GB">Pair</Translation>
+      </Text>
+      <Text Id="TEXT_PAIR_ANOTHER" Alignment="Left" TypographyId="Poppins_Regular_18">
+        <Translation Language="GB">Pair Another</Translation>
+      </Text>
+      <Text Id="TEXT_DEVICE_PAIRED" Alignment="Left" TypographyId="Poppins_Regular_18">
+        <Translation Language="GB">device paired</Translation>
+      </Text>
+      <Text Id="TEXT_DEVICES_PAIRED" Alignment="Left" TypographyId="Poppins_Regular_18">
+        <Translation Language="GB">devices paired</Translation>
+      </Text>
+      <Text Id="TEXT_RECONNECTED" Alignment="Left" TypographyId="Poppins_Regular_18">
+        <Translation Language="GB">Reconnected</Translation>
       </Text>
       <Text Id="TEXT_SOUNDS_UC" Alignment="Left" TypographyId="Poppins_Regular_18">
         <Translation Language="GB">SOUNDS</Translation>
