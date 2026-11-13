@@ -42,6 +42,12 @@ void SensorPolicy::onActivityDurationChanged(uint32_t minutesSinceBoot)
     mActivityMinutes = minutesSinceBoot;
 }
 
+void SensorPolicy::onWornChanged(bool worn)
+{
+    OS::MutexCS cs(mDataMutex);
+    mWorn = worn;
+}
+
 // ============================================================================
 // IActivityDataSource
 // ============================================================================
@@ -73,9 +79,14 @@ float SensorPolicy::currentAvgHr() const
     // (watch taken off, HR subsensor stopped) it would keep its last value
     // indefinitely, and DailyHealth books currentAvgHr() into every minute:
     // a watch left on the bedside table recorded hours of a flat HR, which
-    // then became the day's resting HR. Report "no reading" once the last
-    // valid sample is too old to stand for the present.
+    // then became the day's resting HR. Report "no reading" as soon as the
+    // FSM says the watch is off the wrist, and otherwise once the last
+    // valid sample is too old to stand for the present (HR stopped while
+    // still worn).
     // Lock order mDataMutex -> FeatureCenter::mMutex, as elsewhere here.
+    if (!mWorn) {
+        return 0.0f;
+    }
     return mFeatures.hasRecentHr() ? mHr : 0.0f;
 }
 

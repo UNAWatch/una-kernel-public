@@ -89,6 +89,10 @@ private:
     /// Last notified value; used to suppress no-change notifications.
     uint32_t mLastDuration = 0;
 
+    /// Last notified wear state (FSM in a worn state). Starts false to
+    /// match the FSM, which boots through IDLE and UNWORN.
+    bool mLastWorn = false;
+
     void thread();
     void fsmTimerCallback(void* arg);
 
