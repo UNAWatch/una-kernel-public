@@ -855,7 +855,7 @@
         <Translation Language="GB">Waiting for&#10;connection</Translation>
       </Text>
       <Text Id="TEXT_UNPAIR" Alignment="Left" TypographyId="Poppins_Regular_18">
-        <Translation Language="GB">Unpair</Translation>
+        <Translation Language="GB">Unpair All</Translation>
       </Text>
       <Text Id="TEXT_PAIRED" Alignment="Left" TypographyId="Poppins_Regular_18">
         <Translation Language="GB">Paired</Translation>
