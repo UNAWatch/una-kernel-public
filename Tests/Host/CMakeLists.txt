@@ -66,7 +66,18 @@ set(KERNEL_LIB_SOURCES
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/App/AliasRules.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/Crc/Crc32.cpp"
     "${UNA_KERNEL_ROOT}/Software/Libs/Source/Hardware/AG3335/AirohaEpoParser.cpp"
+    "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/CLI/CLIInput.c"
+    "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/CLI/CLIHistory.c"
+    "${UNA_KERNEL_ROOT}/Software/Libs/Source/Components/LinkedList/LinkedList.c"
 )
+
+# The CLI's build options live in the firmware's Core/Inc, next to its Porting.h,
+# which pulls in the STM32 HAL. Copy just the two headers the CLI needs, so their
+# "Porting.h" resolves to the host stub in include/.
+configure_file("${UNA_KERNEL_ROOT}/Software/App/UnaWatch-CubeIDE/Core/Inc/CLIOptions.h"
+               "${CMAKE_CURRENT_BINARY_DIR}/firmware-config/CLIOptions.h" COPYONLY)
+configure_file("${UNA_KERNEL_ROOT}/Software/App/UnaWatch-CubeIDE/Core/Inc/ASCIICodes.h"
+               "${CMAKE_CURRENT_BINARY_DIR}/firmware-config/ASCIICodes.h" COPYONLY)
 
 # The Bosch BMM350 SensorAPI is vendor C source that BMM350.cpp sits on top of.
 # Not held to the warning set above, which is for code this repository owns. It
@@ -108,6 +119,7 @@ target_include_directories(una_host_test_support PUBLIC
     "${UNA_KERNEL_ROOT}/Software/Libs/Header/Hardware"
     "${UNA_KERNEL_ROOT}/Software/ThirdParty/BOSCH/BMM350_SensorAPI"
     "${UNA_KERNEL_ROOT}/SDK/Libs/Header"
+    "${CMAKE_CURRENT_BINARY_DIR}/firmware-config"
 )
 
 add_executable(una-host-tests
@@ -125,6 +137,7 @@ add_executable(una-host-tests
     kernel/BMM350_test.cpp
     kernel/CadenceEstimator_test.cpp
     kernel/ChargeThermalMonitor_test.cpp
+    kernel/CLIInput_test.cpp
     kernel/ConnParamNegotiation_test.cpp
     kernel/DailyLedger_test.cpp
     kernel/DualAppCommOwnership_test.cpp
