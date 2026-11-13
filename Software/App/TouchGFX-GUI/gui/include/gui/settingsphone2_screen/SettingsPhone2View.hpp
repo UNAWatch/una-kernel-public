@@ -12,6 +12,8 @@ public:
     virtual void setupScreen();
     virtual void tearDownScreen();
 
+    void connected(bool connected);
+
 protected:
     virtual void handleKeyEvent(uint8_t key) override;
 };

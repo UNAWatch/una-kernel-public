@@ -25,12 +25,30 @@ void SettingsPhone2View::setupScreen()
     pN = menu.getNotSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR);
     pN->config(T_TEXT_UNPAIR);
 
+    // PAIR
+    pS = menu.getSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_PAIR);
+    pS->config(T_TEXT_PAIR);
+
+    pN = menu.getNotSelectedItem(Gui::Config::Menu::Top::Settings::Phone::ID_PAIR);
+    pN->config(T_TEXT_PAIR);
+
     menu.invalidate();
 }
 
 void SettingsPhone2View::tearDownScreen()
 {
     SettingsPhone2ViewBase::tearDownScreen();
+}
+
+void SettingsPhone2View::connected(bool connected)
+{
+    if (connected) {
+        menu.selectItem(Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR);
+        menu.setNumberOfItems(Gui::Config::Menu::Top::Settings::Phone::ID_PAIR);
+    } else {
+        menu.setNumberOfItems(Gui::Config::Menu::Top::Settings::Phone::ID_COUNT);
+    }
+    menu.invalidate();
 }
 
 void SettingsPhone2View::handleKeyEvent(uint8_t key)
@@ -50,6 +68,10 @@ void SettingsPhone2View::handleKeyEvent(uint8_t key)
             case Gui::Config::Menu::Top::Settings::Phone::ID_UNPAIR:
                 presenter->unpair();
                 application().gotoSettingsPhone1ScreenNoTransition();
+                break;
+            case Gui::Config::Menu::Top::Settings::Phone::ID_PAIR:
+                presenter->startPairing();
+                application().gotoPairingScreenNoTransition();
                 break;
             default:
                 break;

@@ -29,7 +29,10 @@ public:
 
     virtual void onIdleTimeout() override { model->application().gotoHomeScreenNoTransition(); }
 
+    virtual void onBleConnect(bool connected) override;
+
     void unpair();
+    void startPairing();
 
 private:
     SettingsPhone2Presenter();

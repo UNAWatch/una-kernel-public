@@ -267,6 +267,7 @@ namespace Phone
  */
 enum Id {
     ID_UNPAIR = 0,
+    ID_PAIR,
 
     ID_COUNT,   // Number of items in the phone settings menu
     ID_DEFAULT = ID_UNPAIR,
