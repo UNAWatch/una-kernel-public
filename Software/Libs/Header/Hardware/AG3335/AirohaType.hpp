@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -86,6 +87,20 @@ struct ReferenceLocation {
     float bear      = 0.0f;     // Bearing in degrees [Range: 0~179 degrees]
     float accVert   = 100.0f;   // Vertical RMS accuracy [m]
 };
+
+/**
+ * @brief Whether a reference location is the "no location" marker, (0, 0, 0).
+ *
+ * Saving the marker clears the stored location (Backend does this on reset).
+ * Latitude and longitude are signed (south and west are negative), so the test
+ * is on magnitudes: a real fix in the southern and western hemispheres at or
+ * below sea level is not the marker.
+ */
+inline bool isUnsetReferenceLocation(float lat, float lon, float alt)
+{
+    constexpr float kEpsilon = 0.000001f;
+    return std::fabs(lat) < kEpsilon && std::fabs(lon) < kEpsilon && std::fabs(alt) < kEpsilon;
+}
 
 struct EpoGnssStatus {
     SystemType SysId;   // The GNSS system ID.

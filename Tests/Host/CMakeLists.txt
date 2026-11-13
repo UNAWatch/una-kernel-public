@@ -116,6 +116,7 @@ add_executable(una-host-tests
     kernel/ActivityTracker_test.cpp
     kernel/AppSurfaceInfo_test.cpp
     kernel/AppType_test.cpp
+    kernel/AirohaReferenceLocation_test.cpp
     kernel/BaroCadence_test.cpp
     kernel/BaroMs5837_test.cpp
     kernel/BaroP0Adjuster_test.cpp
