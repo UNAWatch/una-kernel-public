@@ -955,4 +955,19 @@ void operator delete[](void* ptr, const std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT
     free(ptr);
 }
 
+//    std::terminate() defaults to libstdc++'s verbose handler, which demangles
+//    the exception's type name and prints it, with what(), to stderr before
+//    calling abort(). Here stderr goes nowhere (_write() in syscalls.c
+//    discards it), so all that handler adds is the demangler: ~33 KB of flash.
+//    Defining the handler drops it; terminate still ends in the abort() above,
+//    which logs and asserts into the crash dump as before.
+//    (std::set_terminate(std::abort) would not help: libstdc++ still
+//    references the default handler, and that keeps the demangler linked.)
+namespace __gnu_cxx {
+void __verbose_terminate_handler()
+{
+    abort();
+}
+} // namespace __gnu_cxx
+
 #endif // (USE_ORIGINAL == 0)
