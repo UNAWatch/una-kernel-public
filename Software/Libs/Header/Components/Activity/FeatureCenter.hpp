@@ -62,6 +62,10 @@ public:
     // sync with what the trackers say.
     float currentAvgHr() const;
 
+    // Whether currentAvgHr() still describes the present: a valid HR
+    // sample landed within the last two measurement periods.
+    bool hasRecentHr() const;
+
     // Polled by Activity::Service after each FSM tick. Integrates the
     // elapsed active time into the accumulator and returns the running
     // total in minutes.

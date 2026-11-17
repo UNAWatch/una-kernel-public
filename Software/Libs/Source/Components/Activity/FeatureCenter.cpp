@@ -90,6 +90,12 @@ float FeatureCenter::currentAvgHr() const
     return mHr.avgLastMinute();
 }
 
+bool FeatureCenter::hasRecentHr() const
+{
+    OS::MutexCS cs(mMutex);
+    return mHr.hasRecentValidSample(OS::GetTimeMs());
+}
+
 uint32_t FeatureCenter::currentActivityDuration()
 {
     OS::MutexCS cs(mMutex);

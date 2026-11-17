@@ -42,8 +42,12 @@ public:
     /// ActivityTracker (cadence path + HR-evidence path).
     virtual uint32_t activityMinutesSinceBoot() const = 0;
 
-    /// Latest rolling-average heart rate over the last minute (0.0
-    /// if no valid samples in the window).
+    /// Average heart rate over the minute ending at the last valid
+    /// sample, not at now: between measurements on a worn, still watch
+    /// the same average can repeat for up to two HR measurement periods
+    /// (10 min). 0.0 ("no reading") if there are no valid samples in
+    /// that window, if the watch is not worn, or if the last valid
+    /// sample is more than 10 min old.
     virtual float currentAvgHr() const = 0;
 };
 

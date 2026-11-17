@@ -34,6 +34,15 @@ public:
      *        concern.
      */
     virtual void onActivityDurationChanged(uint32_t minutesSinceBoot) = 0;
+
+    /**
+     * @brief Called when the Activity FSM moves between worn
+     *        (STATIONARY, LIGHT_ACTIVE, ACTIVE) and not worn (IDLE,
+     *        UNWORN). Fired on the same worker thread, only on change.
+     *        Default is a no-op, so listeners that only want the minute
+     *        total need not implement it.
+     */
+    virtual void onWornChanged(bool worn) { (void)worn; }
 };
 
 } // namespace Activity

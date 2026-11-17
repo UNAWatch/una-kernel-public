@@ -70,6 +70,7 @@ public:
     // produces on its FSM-tick cadence, so IActivityDataSource queries
     // become cheap reads instead of mutating tracker ticks.
     void onActivityDurationChanged(uint32_t minutesSinceBoot) override;
+    void onWornChanged(bool worn) override;
 
     // IActivityDataSource - cumulative-from-boot accessors.
     uint32_t stepsSinceBoot() const override;
@@ -95,6 +96,8 @@ private:
     /// Latest activity-minute total pushed by Service through
     /// IDurationListener.
     uint32_t mActivityMinutes = 0;
+    /// FSM wear state pushed by Service. Not worn until the FSM says so.
+    bool     mWorn = false;
 
     mutable OS::Mutex mDataMutex;
 

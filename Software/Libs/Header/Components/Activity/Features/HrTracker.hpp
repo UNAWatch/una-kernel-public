@@ -39,7 +39,16 @@ public:
     /// Mean BPM over the trailing minute (zero if no valid samples).
     /// Computed independently of isValidLastMinute() - caller decides
     /// whether to publish.
+    /// @note The window ends at the last valid sample, not at "now", so
+    ///       this keeps returning the last average after the sensor stops.
+    ///       Gate it with hasRecentValidSample() before recording it.
     float avgLastMinute() const;
+
+    /// Whether the last valid sample is recent enough (within skMaxAgeMs,
+    /// two measurement periods) to stand for the current minute. Stays
+    /// true between periodic probes while the watch is worn, and turns
+    /// false once samples stop arriving (watch off the wrist, HR stopped).
+    bool hasRecentValidSample(uint32_t nowMs) const;
 
 private:
     struct Sample

@@ -18,8 +18,8 @@ typedef void (*CLIInput_handleSymbol_t)(CLIInput_t* in, char symbol);
 
 struct CLIInputStruct_t {
     char    buffer[CLI_MANAGER_BUFFER_LEN];
-    uint8_t bufferInsPos;
-    uint8_t bufferEndPos;
+    uint16_t bufferInsPos;
+    uint16_t bufferEndPos;
 
     int   argC;
     char* argV[CLI_PARAMS_COUNT];
