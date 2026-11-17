@@ -62,6 +62,20 @@ struct WatchSettingsLocal {
             DATE_ORDER_COUNT   ///< Total number of date orders (for iteration).
         };
 
+        enum TimeZone {
+            TZ_AUTO_BLE = 0,    ///< Use BLE-synced / RTC offset
+            TZ_CET,             ///< Europe/Brussels, Paris, Berlin (Auto DST)
+            TZ_UK,              ///< Europe/London (Auto DST)
+            TZ_EET,             ///< Europe/Athens, Helsinki (Auto DST)
+            TZ_UTC,             ///< UTC+0 (Fixed)
+            TZ_UTC_PLUS_1,      ///< UTC+1 (Fixed)
+            TZ_UTC_PLUS_2,      ///< UTC+2 (Fixed)
+            TZ_EST,             ///< US Eastern (Auto DST)
+            TZ_PST,             ///< US Pacific (Auto DST)
+
+            TZ_COUNT
+        };
+     
         Format format = FMT_24H;            ///< Time format of the watch face.
         bool seconds = false;               ///< Show seconds next to hours and minutes.
         DateOrder dateOrder = DATE_DMY;     ///< Day/month order on the watch face.
@@ -70,13 +84,19 @@ struct WatchSettingsLocal {
          * @brief Equality operator to compare two clock configurations.
          * @param other The other Clock object to compare.
          * @return 'true' if the configurations are equal, 'false' otherwise.
-         */
+        
+        */
+
+        TimeZone timeZone = TZ_AUTO_BLE;    ///< Time zone / DST rule preset.
+
         bool operator==(const Clock &other) const
         {
             return (format == other.format &&
                     seconds == other.seconds &&
-                    dateOrder == other.dateOrder);
+                    dateOrder == other.dateOrder &&
+                    timeZone == other.timeZone);
         }
+
 
         /**
          * @brief Inequality operator to compare two clock configurations.

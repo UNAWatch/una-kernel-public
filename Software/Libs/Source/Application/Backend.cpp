@@ -62,6 +62,61 @@
 
 namespace {
 
+/** add helper function that maps 
+WatchSettingsLocal::Clock::TimeZone to both the RTC backup registers 
+and the POSIX TZ string */
+
+void applyLocalTimeZone(WatchSettingsLocal::Clock::TimeZone tzPreset)
+{
+    using TZ = WatchSettingsLocal::Clock::TimeZone;
+    switch (tzPreset) {
+        case TZ::TZ_CET:
+            Driver::Rtc::GetInstance().setTimeZone(3600);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("CET-1CEST,M3.5.0,M10.5.0/3");
+            break;
+        case TZ::TZ_UK:
+            Driver::Rtc::GetInstance().setTimeZone(0);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("GMT0BST,M3.5.0/1,M10.5.0");
+            break;
+        case TZ::TZ_EET:
+            Driver::Rtc::GetInstance().setTimeZone(7200);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("EET-2EEST,M3.5.0/3,M10.5.0/4");
+            break;
+        case TZ::TZ_UTC:
+            Driver::Rtc::GetInstance().setTimeZone(0);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("UTC0");
+            break;
+        case TZ::TZ_UTC_PLUS_1:
+            Driver::Rtc::GetInstance().setTimeZone(3600);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("UNA-1");
+            break;
+        case TZ::TZ_UTC_PLUS_2:
+            Driver::Rtc::GetInstance().setTimeZone(7200);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("UNA-2");
+            break;
+        case TZ::TZ_EST:
+            Driver::Rtc::GetInstance().setTimeZone(-18000);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("EST5EDT,M3.2.0,M11.1.0");
+            break;
+        case TZ::TZ_PST:
+            Driver::Rtc::GetInstance().setTimeZone(-28800);
+            Driver::Rtc::GetInstance().setDstOffset(0);
+            TimePorting_setTimeZoneRule("PST8PDT,M3.2.0,M11.1.0");
+            break;
+        case TZ::TZ_AUTO_BLE:
+        default:
+            TimePorting_updateTimeZone();
+            break;
+    }
+}
+
 // Push the user-configured moderate-intensity HR cutoff into the
 // activity-minute tracker's HR path. The zone-1 upper bound
 // (heartRateZones.thresholds[0], ~50% HRmax) is the WHO lower bound of
@@ -140,7 +195,8 @@ void Backend::thread()
 
     WatchSettingsLocal settingsLocal = Settings::LocalManager::GetInstance().getSettings();
     sendEventToGui(B2GEvent::SettingsLocal{settingsLocal});
-
+    applyLocalTimeZone(settingsLocal.clock.timeZone);
+    
     WatchSettingsDebug settingsDebug = Settings::DebugManager::GetInstance().getSettings();
 
     // External-accessory config (feature flag + remembered straps) for the
@@ -897,6 +953,10 @@ void Backend::guiHandler(const G2BEvent::SettingsLocal &evt)
 
     const WatchSettingsLocal current = slm.getSettings();
     const bool faceChanged = current.watchfaceAppId != evt.settings.watchfaceAppId;
+
+    if (current.clock.timeZone != evt.settings.clock.timeZone) {
+        applyLocalTimeZone(evt.settings.clock.timeZone);
+    }
 
     // Sleep state is the backend's; the GUI's copy of it may be a step behind.
     slm.saveSettings(SleepMode::mergeFromGui(current, evt.settings));
@@ -2012,6 +2072,7 @@ void Backend::onDisconnect()
     sam.refreshBackup();
 
     applyActivityHrThreshold();   // HR zones may have changed via MSD
+    applyLocalTimeZone(slm.getSettings().clock.timeZone);
 
     WatchSettings settings = sm.getSettings();
     sendEventToGui(B2GEvent::Settings{settings});
@@ -2171,6 +2232,10 @@ void Backend::onDisconnect(uint8_t reason)
 // BLE CurrentTimeService
 void Backend::onWriteTime(std::tm localTime)
 {
+    if (Settings::LocalManager::GetInstance().getSettings().clock.timeZone != WatchSettingsLocal::Clock::TZ_AUTO_BLE) {
+        return;
+    }
+
     // 1) Let libc compute DST for this date/time
     localTime.tm_isdst = -1;
 
@@ -2209,6 +2274,10 @@ void Backend::onWriteTimeZoneDST(int16_t tz, uint16_t dstOffset)
 {
     int16_t tzCurrent         = Driver::Rtc::GetInstance().getTimeZone();
     uint16_t dstOffsetCurrent = Driver::Rtc::GetInstance().getDstOffset();
+
+    if (Settings::LocalManager::GetInstance().getSettings().clock.timeZone != WatchSettingsLocal::Clock::TZ_AUTO_BLE) {
+        return;
+    }
 
     // BLE TimeZone already includes DST,
     // however in the system we use them separately
@@ -2252,6 +2321,16 @@ void Backend::onWriteTimeZoneDST(int16_t tz, uint16_t dstOffset)
 
 void Backend::onReadTimeZoneDST(int16_t &tz, uint16_t &dstOffset)
 {
+    const auto preset = Settings::LocalManager::GetInstance().getSettings().clock.timeZone;
+    if (preset != WatchSettingsLocal::Clock::TZ_AUTO_BLE) {
+        time_t now = time(nullptr);
+        std::tm localTime{};
+        const bool isDst = (localtime_r(&now, &localTime) != nullptr) && (localTime.tm_isdst > 0);
+        dstOffset = isDst ? 3600 : 0;
+        tz = Driver::Rtc::GetInstance().getTimeZone() + dstOffset;
+        return;
+    }
+
     dstOffset = Driver::Rtc::GetInstance().getDstOffset();
 
     // BLE TimeZone already includes DST,

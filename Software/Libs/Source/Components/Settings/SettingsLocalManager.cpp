@@ -149,6 +149,12 @@ bool LocalManager::parse(const char*         buff,
         settings.clock.dateOrder = static_cast<WatchSettingsLocal::Clock::DateOrder>(dateOrder);
     }
 
+    uint8_t timeZone = 0;
+    if (r.get("clock.timeZone", timeZone)
+            && timeZone < WatchSettingsLocal::Clock::TimeZone::TZ_COUNT) {
+        settings.clock.timeZone = static_cast<WatchSettingsLocal::Clock::TimeZone>(timeZone);
+    }
+
     // Version 4. As with the clock map, a file written before these existed
     // leaves the defaults in place, so no migration branch is needed. A value
     // outside what the menus offer is ignored rather than clamped: it was not
@@ -240,7 +246,8 @@ size_t LocalManager::create(const WatchSettingsLocal& settings,
         SDK::JsonStreamWriter::KeyedMapScope m{w, "clock"};
         w.add("format", static_cast<uint8_t>(settings.clock.format));
         w.add("seconds", settings.clock.seconds);
-        w.add("dateOrder", static_cast<uint8_t>(settings.clock.dateOrder));
+        w.add("dateOrder", static_cast<uint8_t>(settings.clock.dateOrder));  
+        w.add("timeZone", static_cast<uint8_t>(settings.clock.timeZone));
     }
 
     {

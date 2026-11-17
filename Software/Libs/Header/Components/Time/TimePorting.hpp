@@ -20,5 +20,7 @@ void TimePorting_updateTimeZone();
 void TimePorting_setTimeZone(int16_t tz_minutes);
 void TimePorting_setTime(const struct tm &dateTime);
 
+void TimePorting_setTimeZoneRule(const char* posixTz);
+
 #endif /* __TIME_PORTING_HPP */
 

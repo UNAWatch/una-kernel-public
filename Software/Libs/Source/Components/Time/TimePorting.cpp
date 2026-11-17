@@ -225,6 +225,18 @@ void TimePorting_setTimeZone(int16_t tz_minutes)
     unLock();
 }
 
+void TimePorting_setTimeZoneRule(const char* posixTz)
+{
+    if (!posixTz || !lock()) {
+        return;
+    }
+
+    setenv("TZ", posixTz, 1);
+    tzset();
+
+    unLock();
+}
+
 /**
  * @brief Set the current UTC time into the hardware RTC.
  *
