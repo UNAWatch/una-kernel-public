@@ -30,7 +30,8 @@ void SettingsGpsAssistView::setEpoTimeH(uint32_t h)
         "%lu day%s and %lu hour%s.\n"
         "Sync with the UNA\n"
         "watch app to\n"
-        "refresh data", days, days != 1 ? "s" : "", hours, hours != 1 ? "s" : "");
+        "refresh data", static_cast<unsigned long>(days), days != 1 ? "s" : "",
+        static_cast<unsigned long>(hours), hours != 1 ? "s" : "");
 
     Unicode::fromUTF8(reinterpret_cast<const uint8_t*>(msg), textBuffer, TEXT_SIZE);
     text.invalidate();

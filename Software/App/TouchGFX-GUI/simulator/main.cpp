@@ -9,6 +9,15 @@
 #include <simulator/mainBase.hpp>
 #include "touchgfx/Utils.hpp"
 
+// The UNA Watch housing around the screen comes with SDK/Simulator/WatchHAL.hpp
+// (una-sdk #369). With an older SDK the simulator runs without it.
+#if __has_include("SDK/Simulator/WatchHAL.hpp")
+#include "SDK/Simulator/WatchHAL.hpp"
+#define UNA_SIM_HAL SDK::Simulator::WatchHAL
+#else
+#define UNA_SIM_HAL touchgfx::HALSDL2
+#endif
+
 using namespace touchgfx;
 
 #ifdef __linux__
@@ -29,12 +38,20 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     LCD& lcd = setupLCD();
     touchgfx::NoTouchController tc;
 
-    touchgfx::HAL& hal = touchgfx::touchgfx_generic_init<touchgfx::HALSDL2>(dma, lcd, tc, SIM_WIDTH, SIM_HEIGHT, 0, 0);
+    // WatchHAL = HALSDL2 + the watch housing (F4 cycles it) and the panel look (L).
+    touchgfx::HAL& hal = touchgfx::touchgfx_generic_init<UNA_SIM_HAL>(dma, lcd, tc, SIM_WIDTH, SIM_HEIGHT, 0, 0);
 
     setupSimulator(argc, argv, hal);
 
+#if __has_include("SDK/Simulator/WatchHAL.hpp")
+    static_cast<SDK::Simulator::WatchHAL &>(hal).init();
+
+    // Set custom frame rate (UNA_SIM_SLOW stretches it to the watch's pace)
+    static_cast<touchgfx::HALSDL2 &>(hal).setVsyncInterval(SDK::Simulator::WatchHAL::frameIntervalMs(App::kFrameRate));
+#else
     // Set custom frame rate
     static_cast<touchgfx::HALSDL2 &>(hal).setVsyncInterval(1000.0f / App::kFrameRate);
+#endif
 
     // Ensure there is a console window to print to using printf() or
     // std::cout, and read from using e.g. fgets or std::cin.
