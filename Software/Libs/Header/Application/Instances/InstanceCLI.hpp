@@ -31,6 +31,10 @@ public:
     /// Stop CLI thread and cleanup (bounded wait).
     static void Off();
 
+    /// Leave test mode: restart and boot normally, with no test-mode window on
+    /// that one boot. Does not return.
+    [[noreturn]] static void BootNormally();
+
 private:
     // no instances
     InstanceCLI() = delete;

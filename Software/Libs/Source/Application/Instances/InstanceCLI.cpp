@@ -26,6 +26,7 @@
 #include "Components/CLIUtils/UtilFormat.hpp"
 #include "Components/CLIUtils/UtilUsbMsd.hpp"
 #include "Components/CLIUtils/UtilDev.hpp"
+#include "Components/CLIUtils/UtilBoot.hpp"
 #include "Components/CLIUtils/UtilUsb.hpp"
 #include "Components/CLIUtils/FS/utilFS.hpp"
 
@@ -46,8 +47,27 @@ osEventFlagsId_t  InstanceCLI::sEvent  = nullptr;
 static Driver::SwTimer mTimer;
 static bool            mUsbConnected;
 
+// Set by BootNormally() just before its reset, and read once by the boot that
+// follows. In RAM that a reset keeps and power-up leaves random, so it counts
+// only when it holds exactly this value.
+static constexpr uint32_t kSkipTestWindow = 0x5B007ED1u;
+static volatile uint32_t  sBootFlags __attribute__((section(".boot_flags"), used));
+
+void InstanceCLI::BootNormally()
+{
+    CLIConsole_print("booting normally\n");
+    WAIT(100);    // Let the line out before the port drops, as 'reset' does
+    sBootFlags = kSkipTestWindow;
+    NVIC_SystemReset();
+    for (;;) {}
+}
+
 void InstanceCLI::Init()
 {
+    // A request no boot has read (the cable came out before the restart)
+    // must not skip the window on some later boot.
+    sBootFlags = 0;
+
     if (!sUsb) {
         sUsb = &UsbDevice::GetInstance();
     }
@@ -55,6 +75,13 @@ void InstanceCLI::Init()
 
 void InstanceCLI::WaitTestMode(bool enableMSC)
 {
+    // Test mode was left with 'boot': go straight on, once.
+    if (sBootFlags == kSkipTestWindow) {
+        sBootFlags = 0;
+        LOG_WARNING("test-mode window skipped after 'boot'\n");
+        return;
+    }
+
     Init();
 
     sUsb->init(false, 0);
@@ -211,6 +238,9 @@ void InstanceCLI::CreateUtilsSet(bool workMode)
         CLIManager_addCommand(&sMgr, Components::CliUtils::UtilUsbMsd::getInstance().getCommands());
         CLIManager_addHiddenCommand(&sMgr, Components::CliUtils::UtilModuleInfo::getInstance().getCommands());
         CLIManager_addCommand(&sMgr, Components::CliUtils::UtilFS::getInstance().getCommands());
+
+        // The way out of test mode that does not land in it again.
+        CLIManager_addCommand(&sMgr, Components::CliUtils::UtilBoot::getInstance().getCommands());
     }
 }
 

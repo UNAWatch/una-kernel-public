@@ -63,11 +63,11 @@ _Min_Stack_Size = 0x500; /* required amount of stack */
 /* Memories definition */
 MEMORY
 {
-  /* RAM_CRASH is sized to what it holds, not to a round number. The three
-     NOLOAD sections placed in it below total 0x11800 (71,680 bytes):
-     .crash_dump 6,112 + .log_buffer 65,552 + .systemlog 16. At 72K it has
-     2,048 bytes of slack; at the 128K it used to be, 59,392 bytes were
-     unreachable by anything.
+  /* RAM_CRASH is sized to what it holds, not to a round number. The four
+     NOLOAD sections placed in it below total 0x11808 (71,688 bytes):
+     .crash_dump 6,112 + .log_buffer 65,552 + .systemlog 16 + .boot_flags 8.
+     At 72K it has 2,040 bytes of slack; at the 128K it used to be, 59,392
+     bytes were unreachable by anything.
 
      Every byte not reserved here is a byte of heap, because _estack is
      ORIGIN(RAM) + LENGTH(RAM) and the heap is the span between the end of
@@ -216,6 +216,14 @@ SECTIONS
   {
     . = ALIGN(8);
     KEEP(*(.systemlog))
+    . = ALIGN(8);
+  } > RAM_CRASH
+
+  /* Requests a software reset leaves for the next boot (no-init) */
+  .boot_flags (NOLOAD) :
+  {
+    . = ALIGN(8);
+    KEEP(*(.boot_flags))
     . = ALIGN(8);
   } > RAM_CRASH
 
