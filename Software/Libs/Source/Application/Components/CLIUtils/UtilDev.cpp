@@ -124,17 +124,21 @@ void button(int argc, const char **argv)
     const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(id));
 
     if (strcmp(argv[3], "press") == 0) {
-        buttons.inject(id, true);
         sHeld |= bit;
+        buttons.inject(id, true);
         WAIT(kSettleMs);
     } else if (strcmp(argv[3], "release") == 0) {
         buttons.inject(id, false);
         sHeld &= static_cast<uint8_t>(~bit);
         WAIT(kSettleMs);
     } else if (strcmp(argv[3], "click") == 0) {
+        // Marked held across the wait: if the port closes meanwhile, the
+        // thread is stopped here and stopAll() lets the button go.
+        sHeld |= bit;
         buttons.inject(id, true);
         WAIT(150);    // A click is shorter than 500 ms
         buttons.inject(id, false);
+        sHeld &= static_cast<uint8_t>(~bit);
         WAIT(kSettleMs);
     } else if (strcmp(argv[3], "hold") == 0 && argc == 5) {
         const uint32_t ms = static_cast<uint32_t>(strtoul(argv[4], nullptr, 10));
@@ -142,9 +146,11 @@ void button(int argc, const char **argv)
             fail("hold time must be 1..60000 ms");
             return;
         }
+        sHeld |= bit;
         buttons.inject(id, true);
         WAIT(ms);
         buttons.inject(id, false);
+        sHeld &= static_cast<uint8_t>(~bit);
         WAIT(kSettleMs);
     } else {
         fail("usage: dev button L1|L2|R1|R2 click|press|release|hold <ms>");
