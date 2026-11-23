@@ -33,6 +33,9 @@
 #include "Crc/Crc32.hpp"
 #include "FileSystem/File.hpp"
 #include "OS.hpp"
+#include "Power.hpp"
+#include "System.hpp"
+#include "main.h"
 #include "ff.h"
 
 #include <atomic>
@@ -44,7 +47,7 @@
 namespace {
 
 /// Bumped when a command or a reply changes.
-constexpr uint32_t kProtocolVersion = 2;
+constexpr uint32_t kProtocolVersion = 3;
 
 /// Read size for 'dev crc'.
 constexpr uint32_t kChunk = 256;
@@ -237,6 +240,53 @@ void crcOf(int argc, const char **argv)
 
     CLIConsole_print("#OK %lu %08lX\n", static_cast<unsigned long>(total),
                      static_cast<unsigned long>(crc));
+}
+
+// --- kernel update ----------------------------------------------------------
+
+/// Installs a kernel the way the phone app's BLE command does: the .ota, copied
+/// to /Update/ over the USB drive, goes to the bootloader's volume and the watch
+/// restarts into the bootloader, which installs it.
+void update(int argc, const char **argv)
+{
+    char path[FF_MAX_LFN + 1];
+    if (argc != 3 || !userPath(argv[2], path, sizeof(path))) {
+        fail("usage: dev update /Update/<file>.ota");
+        return;
+    }
+    if (driveIsOpen()) {
+        return;
+    }
+
+    // The checks Backend::onFwUpdateReq() makes, made here first so that a
+    // refusal arrives as a reason rather than a bare failure.
+    const size_t len = strlen(path);
+    if (strncmp(path, UPDATE_DIR_PATH, strlen(UPDATE_DIR_PATH)) != 0 ||
+            len < strlen(OTA_FILE_EXTENSION) ||
+            strcmp(path + len - strlen(OTA_FILE_EXTENSION), OTA_FILE_EXTENSION) != 0) {
+        fail("the file must be /Update/<name>.ota");
+        return;
+    }
+    if (!FS::File::Exist(path)) {
+        fail("no such file");
+        return;
+    }
+    if (Power::GetInstance().getBatteryLevel() < 10) {
+        fail("battery below 10%: charge the watch first");
+        return;
+    }
+
+    // Said before the update starts: on success it does not return, as the
+    // watch restarts once the file is in place.
+    CLIConsole_print("#OK installing; the watch restarts into the bootloader\n");
+    WAIT(100);
+
+    // Through the BLE command's own interface, with the path relative to the
+    // apps volume as that command passes it.
+    Ble::CustomCommandService::Callback &ccs = Backend::GetInstance();
+    if (!ccs.onFwUpdateReq(path + strlen("2:"))) {
+        fail("the update did not start: see the log");
+    }
 }
 
 // --- apps -------------------------------------------------------------------
@@ -481,7 +531,8 @@ const char* Components::CliUtils::UtilDev::getHelp(ICLICommand_t* cmd)
         "Drive the watch from a computer. Turn on Developer mode on the watch\n"
         "first, in Settings > Device.\n"
         "\n"
-        "  dev                              developer mode on/off, protocol\n"
+        "  dev                              protocol, developer mode on/off,\n"
+        "                                   firmware version\n"
         "  dev button L1|L2|R1|R2 click|press|release|hold <ms>\n"
         "  dev screen                       the screen, 240x240 ABGR2222\n"
         "  dev crc <path> [bytes]           size and CRC-32 of a file (of its\n"
@@ -497,6 +548,9 @@ const char* Components::CliUtils::UtilDev::getHelp(ICLICommand_t* cmd)
         "                                   closes or developer mode goes off)\n"
         "  dev log on|off                   stream the log between commands,\n"
         "                                   framed by 0x1E ... 0x1F\n"
+        "  dev update /Update/<file>.ota    install a kernel, as the phone app\n"
+        "                                   does: the watch restarts into the\n"
+        "                                   bootloader, which installs it\n"
         "\n"
         "Paths are on the apps volume: /Apps/... or 2:/Apps/...\n"
         "Each command ends with '#OK ...' or '#ERR <reason>'.\n"
@@ -523,8 +577,8 @@ void Components::CliUtils::UtilDev::execute(ICLICommand_t* cmd,
 
     if (argc == 1) {
         CLIConsole_print("developer mode: %s\n", on ? "on" : "off");
-        CLIConsole_print("#OK %lu %s\n", static_cast<unsigned long>(kProtocolVersion),
-                         on ? "on" : "off");
+        CLIConsole_print("#OK %lu %s %s\n", static_cast<unsigned long>(kProtocolVersion),
+                         on ? "on" : "off", ::Driver::System::GetBuildVersionStr());
         return;
     }
 
@@ -542,6 +596,7 @@ void Components::CliUtils::UtilDev::execute(ICLICommand_t* cmd,
     else if (strcmp(sub, "stop")   == 0) { launch(argc, argv, false); }
     else if (strcmp(sub, "sensor") == 0) { sensor(argc, argv); }
     else if (strcmp(sub, "log")    == 0) { log(argc, argv); }
+    else if (strcmp(sub, "update") == 0) { update(argc, argv); }
     else { fail("unknown command: see 'help dev'"); }
 }
 
