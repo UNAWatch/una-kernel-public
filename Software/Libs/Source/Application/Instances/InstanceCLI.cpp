@@ -150,8 +150,18 @@ void InstanceCLI::Off()
         return;
     }
 
+    Components::CliUtils::UtilDev::cancel(true);
     osThreadFlagsSet(sThread, CLI_STOP);
-    osEventFlagsWait(sEvent, CLI_DONE, osFlagsWaitAny, 3000);
+    uint32_t flags = osEventFlagsWait(sEvent, CLI_DONE, osFlagsWaitAny, 3000);
+
+    // A 'dev' command may hold files open (a kernel update being staged, a
+    // CRC being read): stopping the thread under it would leak them, so it
+    // gets up to a minute to finish.
+    for (uint32_t waited = 3000;
+         (flags & osFlagsError) && waited < 60000 && Components::CliUtils::UtilDev::busy();
+         waited += 100) {
+        flags = osEventFlagsWait(sEvent, CLI_DONE, osFlagsWaitAny, 100);
+    }
 
     if (osThreadGetState(sThread) != osThreadTerminated) {
         osThreadTerminate(sThread);
@@ -162,6 +172,7 @@ void InstanceCLI::Off()
     // The computer that injected sensor values or asked for the log has
     // gone: the sensors go back to their own readings.
     Components::CliUtils::UtilDev::stopAll();
+    Components::CliUtils::UtilDev::cancel(false);
     // osEventFlagsDelete(sEvent); sEvent = nullptr; // keep if you plan to reuse
 }
 

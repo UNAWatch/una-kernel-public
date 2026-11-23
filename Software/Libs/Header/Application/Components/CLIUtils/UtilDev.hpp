@@ -50,6 +50,19 @@ public:
      */
     static void stopAll();
 
+    /**
+     * @brief Whether a 'dev' command is running. It may have files open, so
+     *        the CLI waits for it before stopping its thread.
+     */
+    static bool busy();
+
+    /**
+     * @brief Set while the CLI shuts down: a running 'dev button ... hold'
+     *        releases the button and ends at once, rather than holding up
+     *        the shutdown for its whole length.
+     */
+    static void cancel(bool on);
+
 private:
     ICLICommand_t mCommands;
 

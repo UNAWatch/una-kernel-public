@@ -56,6 +56,13 @@ constexpr char kLogStart = 0x1E;
 constexpr char kLogEnd   = 0x1F;
 
 std::atomic<bool> sLogOn {false};
+
+/// A 'dev' command is running. It may hold files open (dev update, dev crc),
+/// so the CLI's shutdown waits for it rather than stopping the thread under it.
+std::atomic<bool> sBusy {false};
+
+/// The CLI is shutting down (the serial port closed): a hold ends at once.
+std::atomic<bool> sCancel {false};
 uint64_t          sLogCursor = 0;
 
 constexpr size_t  kMaxInjected = 16;
@@ -151,7 +158,22 @@ void button(int argc, const char **argv)
         }
         sHeld |= bit;
         buttons.inject(id, true);
-        WAIT(ms);
+        // Waited in steps, so Developer switched off on the watch or the
+        // serial port closing ends the hold at once, as either ends
+        // everything else started in developer mode.
+        for (uint32_t waited = 0; waited < ms; ) {
+            const uint32_t step = (ms - waited < 100) ? (ms - waited) : 100;
+            WAIT(step);
+            waited += step;
+            const bool off = !developerMode();
+            if (off || sCancel) {
+                buttons.inject(id, false);
+                sHeld &= static_cast<uint8_t>(~bit);
+                fail(off ? "developer mode was switched off: the button is released"
+                         : "the serial port closed: the button is released");
+                return;
+            }
+        }
         buttons.inject(id, false);
         sHeld &= static_cast<uint8_t>(~bit);
         WAIT(kSettleMs);
@@ -351,6 +373,16 @@ void launch(int argc, const char **argv, bool start)
 
 // --- sensors ----------------------------------------------------------------
 
+bool isRecorded(SDK::Sensor::Type type)
+{
+    for (auto t : sInjected) {
+        if (t == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void forget(SDK::Sensor::Type type)
 {
     for (auto &t : sInjected) {
@@ -458,13 +490,18 @@ void sensor(int argc, const char **argv)
         }
     }
 
-    // Recorded first: an injection nothing records could not be stopped.
+    // Recorded first: an injection nothing records could not be stopped. An
+    // update of a sensor already injected keeps its record if it fails, as
+    // the earlier injection is still in place.
+    const bool wasRecorded = isRecorded(type);
     if (!remember(type)) {
         fail("too many sensors injected at once");
         return;
     }
     if (!d->inject(values, static_cast<uint16_t>(count))) {
-        forget(type);
+        if (!wasRecorded) {
+            forget(type);
+        }
         fail("injection failed");
         return;
     }
@@ -567,6 +604,11 @@ void Components::CliUtils::UtilDev::execute(ICLICommand_t* cmd,
     (void) cmd;
     (void) input;
 
+    struct Busy {
+        Busy()  { sBusy = true; }
+        ~Busy() { sBusy = false; }
+    } busy;
+
     const bool on = developerMode();
     if (!on) {
         // Switched off on the watch: nothing started in developer mode
@@ -597,6 +639,16 @@ void Components::CliUtils::UtilDev::execute(ICLICommand_t* cmd,
     else if (strcmp(sub, "log")    == 0) { log(argc, argv); }
     else if (strcmp(sub, "update") == 0) { update(argc, argv); }
     else { fail("unknown command: see 'help dev'"); }
+}
+
+bool Components::CliUtils::UtilDev::busy()
+{
+    return sBusy;
+}
+
+void Components::CliUtils::UtilDev::cancel(bool on)
+{
+    sCancel = on;
 }
 
 void Components::CliUtils::UtilDev::stopAll()
