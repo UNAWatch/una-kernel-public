@@ -444,7 +444,12 @@ bool FileSystem::copy(const char *oldPath, const char *newPath)
         }
 
         fr = f_write(&dest_file, buffer, br, &bw);
-        if (fr != FR_OK || bw < br) {
+        if (fr == FR_OK && bw < br) {
+            // A short write with no error is FatFs saying the volume is full:
+            // a failure, or the copy would end truncated and report success.
+            fr = FR_DENIED;
+        }
+        if (fr != FR_OK) {
             LOG_ERROR("Err [%s] Path: %s\n", ERRSTR(fr), newPath);
             break;
         }
