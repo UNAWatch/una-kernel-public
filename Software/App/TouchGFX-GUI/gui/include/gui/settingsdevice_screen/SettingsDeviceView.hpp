@@ -13,8 +13,10 @@ public:
     virtual void tearDownScreen();
 
     void setInfo(const DeviceInfo &devInfo);
+    void setDeveloperMode(bool on);
 protected:
     DeviceInfo mDevInfo {};
+    bool mDeveloperMode {};
     virtual void handleKeyEvent(uint8_t key) override;
     void update();
 };

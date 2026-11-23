@@ -23,7 +23,7 @@
 struct WatchSettingsLocal {
 
     /// Settings version.
-    static constexpr uint8_t kVersion = 4;
+    static constexpr uint8_t kVersion = 5;
 
     /**
      * @brief GPS power mode enumeration.
@@ -228,6 +228,12 @@ struct WatchSettingsLocal {
     Backlight backlight;                            ///< Backlight settings.
     Sleep sleep;                                    ///< Sleep mode settings and state.
 
+    // Added in version 5
+    /// Developer mode: the USB serial console accepts the commands that drive
+    /// the watch (button presses, screenshots, app launch, injected sensor
+    /// data, log streaming). Switched on the watch, in Settings > Device.
+    bool developerMode = false;
+
     /**
      * @brief Equality operator to compare two local settings configurations.
      * @param other The other SettingsLocal object to compare.
@@ -244,7 +250,8 @@ struct WatchSettingsLocal {
                 clock == other.clock &&
                 watchfaceAppId == other.watchfaceAppId &&
                 backlight == other.backlight &&
-                sleep == other.sleep);
+                sleep == other.sleep &&
+                developerMode == other.developerMode);
     }
 
     /**

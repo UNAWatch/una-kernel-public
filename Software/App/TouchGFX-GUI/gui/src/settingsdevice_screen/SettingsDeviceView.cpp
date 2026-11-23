@@ -26,6 +26,12 @@ void SettingsDeviceView::setInfo(const DeviceInfo &devInfo)
     update();
 }
 
+void SettingsDeviceView::setDeveloperMode(bool on)
+{
+    mDeveloperMode = on;
+    update();
+}
+
 void SettingsDeviceView::handleKeyEvent(uint8_t key)
 {
     if (key == Gui::Config::Button::L1) {
@@ -37,7 +43,10 @@ void SettingsDeviceView::handleKeyEvent(uint8_t key)
     }
 
     if (key == Gui::Config::Button::R1) {
-
+        if (menu.getSelectedItem() == Gui::Config::Menu::Top::Settings::Device::ID_DEVELOPER_MODE) {
+            setDeveloperMode(!mDeveloperMode);
+            presenter->saveDeveloperMode(mDeveloperMode);
+        }
     }
 
     if (key == Gui::Config::Button::R2) {
@@ -96,6 +105,11 @@ void SettingsDeviceView::update()
     pItem = menu.getItem(Gui::Config::Menu::Top::Settings::Device::ID_CE);
     pItem->setTitle(T_TEXT_CE_UC);
     pItem->setValue(mDevInfo.ce);
+
+    // DEVELOPER_MODE: R1 switches it
+    pItem = menu.getItem(Gui::Config::Menu::Top::Settings::Device::ID_DEVELOPER_MODE);
+    pItem->setTitle(T_TEXT_DEVELOPER);
+    pItem->setValue(mDeveloperMode ? "On" : "Off");
 
     menu.invalidate();
 }

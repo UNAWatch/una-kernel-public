@@ -6,10 +6,11 @@
  *
  * @code{.json}
  * {
- *   "version":4,
+ *   "version":5,
  *   "alertMute":false,
  *   "watchFaceId":"A1C0F5D38B26E479",
  *   "gpsPwrMode":0,
+ *   "developerMode":false,
  *   "sound":{
  *     "buttons":false,
  *     "msgCalls":false,
@@ -163,6 +164,9 @@ bool LocalManager::parse(const char*         buff,
     }
     r.get("backlight.gesture", settings.backlight.gesture);
 
+    // Version 5. Absent in older files, which leaves it off.
+    r.get("developerMode", settings.developerMode);
+
     r.get("sleep.schedule",         settings.sleep.schedule);
     r.get("sleep.active",            settings.sleep.active);
     r.get("sleep.scheduledActive",   settings.sleep.scheduledActive);
@@ -221,6 +225,7 @@ size_t LocalManager::create(const WatchSettingsLocal& settings,
     }
 
     w.add("gpsPwrMode", static_cast<uint8_t>(settings.gpsPowerMode));
+    w.add("developerMode", settings.developerMode);
 
     {
         SDK::JsonStreamWriter::KeyedMapScope m{w, "sound"};

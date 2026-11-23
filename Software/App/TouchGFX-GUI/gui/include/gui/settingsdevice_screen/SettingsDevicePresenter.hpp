@@ -27,6 +27,8 @@ public:
 
     virtual ~SettingsDevicePresenter() {}
 
+    void saveDeveloperMode(bool on);
+
     virtual void onIdleTimeout() override { model->application().gotoHomeScreenNoTransition(); }
 
 private:

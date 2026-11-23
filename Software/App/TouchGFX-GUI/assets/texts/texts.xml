@@ -677,6 +677,9 @@
       <Text Id="TEXT_HARDWARE" Alignment="Left" TypographyId="Poppins_Regular_18">
         <Translation Language="GB">Hardware</Translation>
       </Text>
+      <Text Id="TEXT_DEVELOPER" Alignment="Left" TypographyId="Poppins_Regular_18">
+        <Translation Language="GB">Developer</Translation>
+      </Text>
       <Text Id="TEXT_SOFTWARE" Alignment="Left" TypographyId="Poppins_Regular_18">
         <Translation Language="GB">Software</Translation>
       </Text>

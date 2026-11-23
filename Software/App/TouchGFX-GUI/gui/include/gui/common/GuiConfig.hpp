@@ -334,6 +334,7 @@ enum Id {
     ID_BLUETOOTH,
     ID_FCC_ID,
     ID_CE,
+    ID_DEVELOPER_MODE,
 
     ID_COUNT,   // Number of items in the device settings menu
     ID_DEFAULT = ID_DEVICE_ID,
