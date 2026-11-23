@@ -98,6 +98,19 @@ public:
     /// The USB drive is open to a computer. Any thread; a snapshot.
     bool isMsdOpen() const { return mMsdOpen; }
 
+    /**
+     * @brief  Put a firmware update in place for the bootloader, without the
+     *         restart that installs it: what the phone app's update command does
+     *         before it restarts the watch (onFwUpdateReq()).
+     *
+     * @param  path  The .ota, relative to the apps volume: "/Update/<name>.ota".
+     *
+     * @return false if the file is not an .ota in /Update/, is missing, the
+     *         battery is below 10%, or the copy failed. On true, the next
+     *         restart installs it.
+     */
+    bool stageFwUpdate(const char *path);
+
     /// The drive is held closed (closeMsdByHand(), or a software reset with
     /// the cable in) until the cable is unplugged or openMsdByHand() is
     /// called.

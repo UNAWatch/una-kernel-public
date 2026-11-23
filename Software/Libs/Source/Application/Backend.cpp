@@ -2532,6 +2532,17 @@ void Backend::onRebootReq()
 
 bool Backend::onFwUpdateReq(const char *path)
 {
+    if (!stageFwUpdate(path)) {
+        return false;
+    }
+
+    Power::GetInstance().reboot();
+
+    return true;
+}
+
+bool Backend::stageFwUpdate(const char *path)
+{
     // path - relative to BLE_ROOT_DIR
 
     char realPath[Interface::IFileSystem::skMaxPathLen] {};
@@ -2567,8 +2578,6 @@ bool Backend::onFwUpdateReq(const char *path)
     }
 
     fs.remove(realPath);
-
-    Power::GetInstance().reboot();
 
     return true;
 }

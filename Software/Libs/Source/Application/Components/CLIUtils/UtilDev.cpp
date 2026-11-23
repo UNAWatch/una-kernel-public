@@ -258,7 +258,7 @@ void update(int argc, const char **argv)
         return;
     }
 
-    // The checks Backend::onFwUpdateReq() makes, made here first so that a
+    // The checks Backend::stageFwUpdate() makes, made here first so that a
     // refusal arrives as a reason rather than a bare failure.
     const size_t len = strlen(path);
     if (strncmp(path, UPDATE_DIR_PATH, strlen(UPDATE_DIR_PATH)) != 0 ||
@@ -276,17 +276,16 @@ void update(int argc, const char **argv)
         return;
     }
 
-    // Said before the update starts: on success it does not return, as the
-    // watch restarts once the file is in place.
-    CLIConsole_print("#OK installing; the watch restarts into the bootloader\n");
-    WAIT(100);
-
-    // Through the BLE command's own interface, with the path relative to the
-    // apps volume as that command passes it.
-    Ble::CustomCommandService::Callback &ccs = Backend::GetInstance();
-    if (!ccs.onFwUpdateReq(path + strlen("2:"))) {
-        fail("the update did not start: see the log");
+    // The BLE command's own staging, with the path relative to the apps volume
+    // as that command passes it. #OK only once the update is in place, then
+    // the restart that installs it.
+    if (!Backend::GetInstance().stageFwUpdate(path + strlen("2:"))) {
+        fail("the update could not be put in place: see the log");
+        return;
     }
+    CLIConsole_print("#OK installing; the watch restarts into the bootloader\n");
+    WAIT(100);    // Let the line out before the port drops, as 'reset' does
+    Power::GetInstance().reboot();
 }
 
 // --- apps -------------------------------------------------------------------
