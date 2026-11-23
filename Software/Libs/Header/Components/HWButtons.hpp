@@ -100,6 +100,20 @@ public:
         return mButtons[static_cast<uint8_t>(id)].getTime();
     }
 
+    /**
+     * @brief   Press or release a button as if by hand.
+     *
+     * @details The level goes into the button's debounce filter where the
+     *          pin's own level would, so every observer, the click and long
+     *          press timing, the hold timers and get() see what a finger gives.
+     *          Used by the developer-mode USB commands. Call from a thread,
+     *          not an interrupt.
+     *
+     * @param   id      The button.
+     * @param   pressed true to press it, false to release it.
+     */
+    void inject(Interface::IButtons::Id id, bool pressed);
+
 protected:
 
     HWButtons() = default;;
@@ -122,6 +136,7 @@ private:
         void deinit();
         bool get();
         uint32_t getTime();
+        void inject(bool pressed);
 
         virtual ~Btn() = default;
     private:

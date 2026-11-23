@@ -223,7 +223,41 @@ namespace Sensor
 
         const char* getDescription();
 
+        /**
+         * @brief  Publish given values in place of the source's (developer mode).
+         *
+         * @details Until stopInjection(), the source's own samples are dropped
+         *          and the Manager's sweep publishes these values instead: at
+         *          the driver's period for a periodic driver, once per call for
+         *          an event-based one. Listeners get them through the usual
+         *          queues, so apps and kernel consumers alike see them. Nothing
+         *          is published while no listener is connected.
+         *
+         * @param  values  One value per field, in the type's field order.
+         * @param  count   Must equal the driver's field count.
+         *
+         * @return false if count is wrong or there is no memory.
+         */
+        bool inject(const SDK::Sensor::Data::Field* values, uint16_t count);
+
+        /// @brief Go back to the source's own samples.
+        void stopInjection();
+
+        bool isInjected() const;
+
+        uint16_t getFieldCount() const;
+
+        /**
+         * @brief  Publish the injected values if they are due. Sweep thread only.
+         *
+         * @return Milliseconds until the next is due, UINT32_MAX for none.
+         */
+        uint32_t publishInjected(uint32_t nowMs);
+
     private:
+        /// Hands mDataSample to the listeners. Called with mMutex held.
+        void deliverLocked();
+
         /// The shared node pool. Function-local inside the accessor so it is
         /// built before the first driver takes a reference to it, whatever
         /// order the sensor objects happen to be constructed in.
@@ -366,6 +400,13 @@ namespace Sensor
         /// Clock of a source sampled on the sweep, null for the others.
         SourceTick*                  mSourceTick;
         const SourceStepTrack*       mSourceSteps;
+
+        // Developer-mode injection. The values are allocated on first use and
+        // kept, guarded by mMutex.
+        SDK::Sensor::Data::Field*    mInjectedValues;
+        std::atomic<bool>            mInjected;
+        bool                         mInjectPending;    ///< Not yet published
+        uint32_t                     mInjectLastMs;
     }; /* class Driver */
 
 } // namespace Sensor

@@ -10,6 +10,7 @@
 
 #include "SensorLayer/Core/SensorManager.hpp"
 #include "SwTimer.hpp"
+#include "System.hpp"
 
 #define LOG_MODULE_PRX      "Sensor.Mgr"
 #define LOG_MODULE_LEVEL    LOG_LEVEL_INFO
@@ -394,6 +395,17 @@ void Sensor::Manager::thread()
                     diagnostic.preRefresh();
                     s->sensorRefresh();
                     diagnostic.postRefresh();
+                }
+
+                // Developer-mode injected values, published at the drivers'
+                // own pace, as the sources above publish theirs: before the
+                // overdue flush below, so it sees them.
+                const uint32_t nowMs = ::Driver::System::GetTimeMs();
+                for (auto d : mDrivers) {
+                    const uint32_t due = d->publishInjected(nowMs);
+                    if (due < waitMs) {
+                        waitMs = due;
+                    }
                 }
 
                 // What a listener holds must not wait on a source that has

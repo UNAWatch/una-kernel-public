@@ -25,7 +25,7 @@
 #include "Components/CLIUtils/UtilModuleInfo.hpp"
 #include "Components/CLIUtils/UtilFormat.hpp"
 #include "Components/CLIUtils/UtilUsbMsd.hpp"
-#include "Components/CLIUtils/UtilAppStart.hpp"
+#include "Components/CLIUtils/UtilDev.hpp"
 #include "Components/CLIUtils/UtilUsb.hpp"
 #include "Components/CLIUtils/FS/utilFS.hpp"
 
@@ -131,6 +131,10 @@ void InstanceCLI::Off()
     }
 
     sThread = nullptr;
+
+    // The computer that injected sensor values or asked for the log has
+    // gone: the sensors go back to their own readings.
+    Components::CliUtils::UtilDev::stopAll();
     // osEventFlagsDelete(sEvent); sEvent = nullptr; // keep if you plan to reuse
 }
 
@@ -186,14 +190,14 @@ void InstanceCLI::CreateUtilsSet(bool workMode)
 
     if (workMode) {
         // work-only set
-        // Hidden dev aid: drive app lifecycle without the GUI (bench testing
-        // over USB, where the charging screen owns the display). Work-mode
-        // only -- it posts to the Backend, which doesn't run in test mode.
-        CLIManager_addHiddenCommand(&sMgr, Components::CliUtils::UtilAppStart::getInstance().getCommands());
-
         // The USB drive: open/close it with the cable in, and whether it
         // opens by itself. Work mode only, as it posts to the Backend.
         CLIManager_addCommand(&sMgr, Components::CliUtils::UtilUsb::getInstance().getCommands());
+
+        // Developer mode: a computer drives the watch (buttons, screenshots,
+        // injected sensor data, the log). Refused unless the owner turned
+        // developer mode on, on the watch.
+        CLIManager_addCommand(&sMgr, Components::CliUtils::UtilDev::getInstance().getCommands());
 
         // Hidden bench tool: fit the magnetometer's hard- and soft-iron
         // correction and keep it. Work mode only, and not by preference - test
@@ -222,6 +226,7 @@ void InstanceCLI::Task(void* /*arg*/)
         }
 
         CLIManager_refresh(&sMgr);
+        Components::CliUtils::UtilDev::poll();
     }
 
     if (sEvent) {

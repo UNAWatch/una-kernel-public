@@ -48,6 +48,16 @@ bool HWButtons::deinit()
     return true;
 }
 
+void HWButtons::inject(Interface::IButtons::Id id, bool pressed)
+{
+    const size_t i = static_cast<size_t>(id);
+    if (!mIsInit || i >= mButtons.size()) {
+        return;
+    }
+
+    mButtons[i].inject(pressed);
+}
+
 void HWButtons::onPress(Id id)
 {
     mObserver.notify(&Interface::IButtons::Callback::onPress, id);
@@ -244,6 +254,15 @@ void HWButtons::Btn::deinit()
     mTim_1s.deinit();
     mTim_5s.deinit();
     mTim_10s.deinit();
+}
+
+void HWButtons::Btn::inject(bool pressed)
+{
+    // The pin is low while pressed. The edge interrupt feeds the same filter,
+    // so keep it out while this thread does.
+    taskENTER_CRITICAL();
+    mFilter.add(!pressed);
+    taskEXIT_CRITICAL();
 }
 
 bool HWButtons::Btn::get()

@@ -13,6 +13,7 @@
 #include "System.hpp"
 
 #include <algorithm>
+#include <new>
 
 #define LOG_MODULE_PRX      "Sensor.Driver"
 #define LOG_MODULE_LEVEL    LOG_LEVEL_INFO
@@ -130,6 +131,10 @@ Sensor::Driver::Driver(Interface::ISensor&        sensor,
     , mSourceStepUs(0)
     , mSourceTick(nullptr)
     , mSourceSteps(nullptr)
+    , mInjectedValues(nullptr)
+    , mInjected(false)
+    , mInjectPending(false)
+    , mInjectLastMs(0)
 {
     mConnMutex.init(LOG_MODULE_PRX);
     mMutex.init(LOG_MODULE_PRX);
@@ -171,6 +176,16 @@ void Sensor::Driver::pushDataSample()
 
     OS::MutexUnlocker unlocker(mMutex);
 
+    // Injected values stand in for the source's while injection is on.
+    if (mInjected.load(std::memory_order_relaxed)) {
+        return;
+    }
+
+    deliverLocked();
+}
+
+void Sensor::Driver::deliverLocked()
+{
     if (mNewConnectionListener) {
         mNewConnectionListener->forceData(mDataSample.getData());
     } else if (mMode == Mode::EVENT_BASED) {
@@ -715,6 +730,89 @@ uint32_t Sensor::Driver::flushOverdue()
 bool Sensor::Driver::isActive() const
 {
     return mActive.load(std::memory_order_relaxed);
+}
+
+uint16_t Sensor::Driver::getFieldCount() const
+{
+    return static_cast<uint16_t>(mDataSample.getFieldCount());
+}
+
+bool Sensor::Driver::inject(const SDK::Sensor::Data::Field* values, uint16_t count)
+{
+    if (values == nullptr || count != getFieldCount()) {
+        return false;
+    }
+
+    if (!mMutex.lock(2000)) {
+        LOG_ERROR("failed to lock the mutex\n");
+        return false;
+    }
+    OS::MutexUnlocker unlocker(mMutex);
+
+    if (mInjectedValues == nullptr) {
+        mInjectedValues = new (std::nothrow) SDK::Sensor::Data::Field[count];
+        if (mInjectedValues == nullptr) {
+            return false;
+        }
+    }
+
+    for (uint16_t i = 0; i < count; ++i) {
+        mInjectedValues[i] = values[i];
+    }
+    mInjectPending = true;
+    mInjected.store(true, std::memory_order_relaxed);
+    Sensor::Manager::getInstance().wake();
+    return true;
+}
+
+void Sensor::Driver::stopInjection()
+{
+    mInjected.store(false, std::memory_order_relaxed);
+}
+
+bool Sensor::Driver::isInjected() const
+{
+    return mInjected.load(std::memory_order_relaxed);
+}
+
+uint32_t Sensor::Driver::publishInjected(uint32_t nowMs)
+{
+    if (!mInjected.load(std::memory_order_relaxed) || !isActive()) {
+        return UINT32_MAX;
+    }
+
+    if (!mMutex.lock(2000)) {
+        LOG_ERROR("failed to lock the mutex\n");
+        return UINT32_MAX;
+    }
+    OS::MutexUnlocker unlocker(mMutex);
+
+    // An event-based driver publishes each injected value once; a periodic
+    // one repeats the latest at its period, as its source would.
+    const bool periodic = (mMode == Mode::PERIODIC_BASED);
+    uint32_t   period   = static_cast<uint32_t>(mRefreshPeriod);
+    if (period == 0) {
+        period = 1000;
+    }
+
+    const bool due = mInjectPending || (periodic && (nowMs - mInjectLastMs >= period));
+    if (due && mInjectedValues != nullptr) {
+        const uint16_t count = getFieldCount();
+        SDK::Sensor::Data& data = mDataSample.getData();
+        for (uint16_t i = 0; i < count; ++i) {
+            data.mValue[i] = mInjectedValues[i];
+        }
+        mDataSample.setTimestamp(nowMs);
+        deliverLocked();
+        mInjectPending = false;
+        mInjectLastMs  = nowMs;
+    }
+
+    if (!periodic) {
+        return UINT32_MAX;
+    }
+    const uint32_t elapsed = nowMs - mInjectLastMs;
+    return (elapsed >= period) ? 0 : (period - elapsed);
 }
 
 void Sensor::Driver::setSourceStepUs(uint32_t us)

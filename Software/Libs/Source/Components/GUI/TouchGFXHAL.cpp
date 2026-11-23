@@ -38,6 +38,10 @@
 #include "HWButtons.hpp"
 #include "AppSurface.hpp"
 #include "ComponentFactory.hpp"
+#include "FrameCapture.hpp"
+#include "app_touchgfx.h"
+
+#include <atomic>
 
 using namespace touchgfx;
 
@@ -101,6 +105,63 @@ static bool sFlushBufferReq;
 // Keeps frames off the panel while the kernel boots, so it goes on showing the
 // bootloader's splash image. See releaseBootHold().
 static bool sBootHold = true;
+
+// FrameCapture: a thread asks for a frame, endFrame() tells it the frame is
+// complete and waits until it has been read.
+static std::atomic<bool> sCaptureRequested;
+
+static OS::Semaphore& captureReady()
+{
+    static OS::Semaphore sem(1, 0);
+    return sem;
+}
+
+static OS::Semaphore& captureDone()
+{
+    static OS::Semaphore sem(1, 0);
+    return sem;
+}
+
+bool FrameCapture::hold(uint32_t timeoutMs)
+{
+    // Leftovers from a capture that timed out.
+    while (captureReady().take(0)) {}
+    while (captureDone().take(0)) {}
+
+    sCaptureRequested = true;
+    TouchGFX_ForceFrame();
+
+    if (captureReady().take(timeoutMs)) {
+        return true;
+    }
+
+    // Withdraw the request, unless endFrame() took it meanwhile: then it is
+    // about to say the frame is ready.
+    if (sCaptureRequested.exchange(false)) {
+        return false;
+    }
+    return captureReady().take(1000);
+}
+
+void FrameCapture::release()
+{
+    captureDone().give();
+}
+
+const uint8_t* FrameCapture::pixels()
+{
+    return sFrameBuffer;
+}
+
+uint16_t FrameCapture::width()
+{
+    return skWidth;
+}
+
+uint16_t FrameCapture::height()
+{
+    return skHeight;
+}
 
 void TouchGFXHAL::initialize()
 {
@@ -304,6 +365,12 @@ void TouchGFXHAL::endFrame()
         }
         sFlushBufferReq = false;
         sLcdOn = isOn;
+    }
+
+    // The frame is complete: hold it for a capture until it has been read.
+    if (sCaptureRequested.exchange(false)) {
+        captureReady().give();
+        captureDone().take(3000);
     }
 
     TouchGFXGeneratedHAL::endFrame();

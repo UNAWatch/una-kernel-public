@@ -4144,9 +4144,9 @@
 			<locationURI>PARENT-2-PROJECT_LOC/Libs/Source/Application/Components/CLIUtils/UtilModuleInfo.cpp</locationURI>
 		</link>
 		<link>
-			<name>Libs/Source/Application/Components/CLIUtils/UtilAppStart.cpp</name>
+			<name>Libs/Source/Application/Components/CLIUtils/UtilDev.cpp</name>
 			<type>1</type>
-			<locationURI>PARENT-2-PROJECT_LOC/Libs/Source/Application/Components/CLIUtils/UtilAppStart.cpp</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/Libs/Source/Application/Components/CLIUtils/UtilDev.cpp</locationURI>
 		</link>
 		<link>
 			<name>Libs/Source/Application/Components/CLIUtils/UtilUsb.cpp</name>
