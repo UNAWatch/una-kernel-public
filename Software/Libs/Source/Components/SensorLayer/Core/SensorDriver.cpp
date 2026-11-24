@@ -181,10 +181,10 @@ void Sensor::Driver::pushDataSample()
         return;
     }
 
-    deliverLocked();
+    deliverLocked(getSourceStepUs());
 }
 
-void Sensor::Driver::deliverLocked()
+void Sensor::Driver::deliverLocked(uint32_t stepUs)
 {
     if (mNewConnectionListener) {
         mNewConnectionListener->forceData(mDataSample.getData());
@@ -197,7 +197,7 @@ void Sensor::Driver::deliverLocked()
         }
     } else {
         for (auto& l : mListeners) {
-            l.pushData(mDataSample.getData());
+            l.pushData(mDataSample.getData(), stepUs);
         }
     }
 }
@@ -816,7 +816,9 @@ uint32_t Sensor::Driver::publishInjected(uint32_t nowMs)
             data.mValue[i] = mInjectedValues[i];
         }
         mDataSample.setTimestamp(nowMs);
-        deliverLocked();
+        // Counted in the step they come at: the source's own can be shorter,
+        // and a listener would then be handed fewer than it asked for.
+        deliverLocked(period * 1000u);
         mInjectPending = false;
         mInjectLastMs  = nowMs;
     }

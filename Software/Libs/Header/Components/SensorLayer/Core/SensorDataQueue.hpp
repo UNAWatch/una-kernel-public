@@ -35,7 +35,12 @@ namespace Sensor
 
         void reinit(float period, uint32_t latency);
 
+        /// Keep a reading if it is this listener's turn, counted in the
+        /// step the driver reports for its source.
         void pushData(const SDK::Sensor::Data& d);
+        /// The same, counted in the given step: for injected values, which
+        /// come at a step of their own rather than the source's.
+        void pushData(const SDK::Sensor::Data& d, uint32_t stepUs);
         void forceData(const SDK::Sensor::Data& d);
 
         /**

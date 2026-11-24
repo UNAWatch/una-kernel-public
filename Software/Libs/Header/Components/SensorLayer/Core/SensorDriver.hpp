@@ -256,8 +256,9 @@ namespace Sensor
         uint32_t publishInjected(uint32_t nowMs);
 
     private:
-        /// Hands mDataSample to the listeners. Called with mMutex held.
-        void deliverLocked();
+        /// Hands mDataSample to the listeners, each periodic one decimating it
+        /// as a stream of this step (us). Called with mMutex held.
+        void deliverLocked(uint32_t stepUs);
 
         /// The shared node pool. Function-local inside the accessor so it is
         /// built before the first driver takes a reference to it, whatever

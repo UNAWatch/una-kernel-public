@@ -120,6 +120,39 @@ TEST(SensorDataQueue, DecimatesAgainstTheStepTheDriverReports)
     EXPECT_EQ(passed, 200u);
 }
 
+// Readings that come at a step of their own (injected values) are counted in
+// that step, not the source's: a 40 ms listener on a 20 ms source keeps every
+// reading of a 40 ms stream, where counted in 20 ms steps it would keep every
+// second one.
+TEST(SensorDataQueue, DecimatesAgainstAGivenStep)
+{
+    Sensor::Driver driver;
+    driver.sourceStepUs = 20'000;
+
+    Listener          ownStep;
+    Sensor::DataQueue queue(driver, kFields, &ownStep, 40, 400);   // ten readings
+
+    Listener          sourceStep;
+    Sensor::DataQueue bySource(driver, kFields, &sourceStep, 40, 400);
+
+    for (uint32_t i = 0; i < 20; ++i) {
+        queue.pushData(reading(1'000 + i * 40), 40'000);
+        bySource.pushData(reading(1'000 + i * 40));
+    }
+
+    uint32_t kept = 0;
+    for (const Delivery& d : ownStep.deliveries) {
+        kept += d.count;
+    }
+    EXPECT_EQ(kept, 20u);
+
+    uint32_t keptBySource = 0;
+    for (const Delivery& d : sourceStep.deliveries) {
+        keptBySource += d.count;
+    }
+    EXPECT_EQ(keptBySource, 10u);
+}
+
 // A period float arithmetic leaves a hair under a whole multiple of the step
 // still divides by it: cut rather than rounded, 39.99999 ms would give a
 // divisor of 1 and pass every reading.

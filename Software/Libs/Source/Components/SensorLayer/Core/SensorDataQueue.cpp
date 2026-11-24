@@ -223,6 +223,11 @@ void Sensor::DataQueue::reinit(float period, uint32_t latency)
  */
 void Sensor::DataQueue::pushData(const SDK::Sensor::Data& d)
 {
+    pushData(d, mDriver.getSourceStepUs());
+}
+
+void Sensor::DataQueue::pushData(const SDK::Sensor::Data& d, uint32_t stepUs)
+{
     // Go through DataView rather than combining the two uint32_t fields here.
     // Written out, `mTimeStamp * 1000` is 32-bit arithmetic that wraps at
     // ~71.6 min of uptime; keeping the one widening conversion in DataView
@@ -230,7 +235,7 @@ void Sensor::DataQueue::pushData(const SDK::Sensor::Data& d)
     // constructed and discarded, which optimises away - only mData is read.
     const uint64_t timestampUs = SDK::Sensor::DataView(d, mFieldCount).getTimestampUs();
 
-    if (mSRA.shouldEmit(timestampUs, mDriver.getSourceStepUs())) {
+    if (mSRA.shouldEmit(timestampUs, stepUs)) {
         forceData(d);
     }
 }
