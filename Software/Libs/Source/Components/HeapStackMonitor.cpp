@@ -266,8 +266,14 @@ void HeapStackMonitor::Check(TimerHandle_t xTimer)
     // fordblks (free inside dlmalloc) plus the sbrk headroom (RAM never
     // handed to dlmalloc); the headroom alone is the fragmentation canary -
     // once it reaches 0 only fordblks-sized holes can serve new allocations.
+    // Both read with the scheduler held, as the allocator's own lock does: an
+    // allocation in between can grow the arena, moving bytes from the
+    // headroom to fordblks, and the sum would come out low - and stay in
+    // mSysHeapMinEver, which only goes down.
+    vTaskSuspendAll();
     struct mallinfo mi = mallinfo();
     size_t sbrkHeadroom = Heap_getSbrkHeadroom();
+    (void)xTaskResumeAll();
     size_t sysFreeHeap = (size_t)mi.fordblks + sbrkHeadroom;
     if (sysFreeHeap < mSysHeapMinEver) {
         mSysHeapMinEver = sysFreeHeap;  // true min-ever watermark (sampled)
