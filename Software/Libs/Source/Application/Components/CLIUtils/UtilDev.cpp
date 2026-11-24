@@ -285,9 +285,14 @@ void mem()
     // System heap (newlib/dlmalloc over sbrk): free is the free space inside
     // the allocator plus the headroom sbrk has never handed it; when the
     // headroom reaches 0, only holes of fordblks can serve new allocations.
+    // Both read with the scheduler held, as the allocator's own lock does: a
+    // free in between can merge and trim, moving bytes from fordblks to the
+    // headroom, and they would be counted twice.
+    vTaskSuspendAll();
     const struct mallinfo mi = mallinfo();
-    const size_t total    = HeapStackMonitor::GetSysHeapSize();
     const size_t headroom = Heap_getSbrkHeadroom();
+    (void)xTaskResumeAll();
+    const size_t total    = HeapStackMonitor::GetSysHeapSize();
     const size_t free     = mi.fordblks + headroom;
     // HeapStackMonitor samples the least free every 3 s, so just after a big
     // allocation (an app loading) its figure can still be above the free now.
