@@ -234,12 +234,14 @@ namespace Sensor
          *          alike see them. Nothing is published while no listener is
          *          connected. On an event-based driver, waits up to a second
          *          for the previous injected event to be published, so that
-         *          events injected close together are all delivered.
+         *          events injected close together are all delivered; if it
+         *          is still unpublished, it is kept and false returned.
          *
          * @param  values  One value per field, in the type's field order.
          * @param  count   Must equal the driver's field count.
          *
-         * @return false if count is wrong or there is no memory.
+         * @return false if count is wrong, there is no memory, or an earlier
+         *         event is still unpublished.
          */
         bool inject(const SDK::Sensor::Data::Field* values, uint16_t count);
 

@@ -502,7 +502,7 @@ void sensor(int argc, const char **argv)
         if (!wasRecorded) {
             forget(type);
         }
-        fail("injection failed");
+        fail("injection failed: out of memory, or the previous event is not yet published");
         return;
     }
     CLIConsole_print("#OK %s\n", d->isActive() ? "active" : "idle");
