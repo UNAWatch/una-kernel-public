@@ -228,10 +228,11 @@ namespace Sensor
          *
          * @details Until stopInjection(), the source's own samples are dropped
          *          and the Manager's sweep publishes these values instead: at
-         *          the driver's period for a periodic driver, once per call for
-         *          an event-based one. Listeners get them through the usual
-         *          queues, so apps and kernel consumers alike see them. Nothing
-         *          is published while no listener is connected.
+         *          the fastest listener's sampling period for a periodic
+         *          driver, once per call for an event-based one. Listeners get
+         *          them through the usual queues, so apps and kernel consumers
+         *          alike see them. Nothing is published while no listener is
+         *          connected.
          *
          * @param  values  One value per field, in the type's field order.
          * @param  count   Must equal the driver's field count.

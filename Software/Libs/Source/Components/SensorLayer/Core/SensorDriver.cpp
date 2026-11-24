@@ -788,11 +788,24 @@ uint32_t Sensor::Driver::publishInjected(uint32_t nowMs)
     OS::MutexUnlocker unlocker(mMutex);
 
     // An event-based driver publishes each injected value once; a periodic
-    // one repeats the latest at its period, as its source would.
+    // one repeats the latest at the sampling period its listeners asked for,
+    // as its source would. Not mRefreshPeriod: that is the batch period,
+    // about the latency, and a listener that batches would get one sample
+    // per batch. The listener queues batch these as they batch real ones.
+    // A queue with period 0 is a new connection's one slot, and paces nothing.
     const bool periodic = (mMode == Mode::PERIODIC_BASED);
-    uint32_t   period   = static_cast<uint32_t>(mRefreshPeriod);
-    if (period == 0) {
-        period = 1000;
+    float      fastest  = 0.0f;
+    for (const auto& l : mListeners) {
+        const float p = l.getPeriod();
+        if (p > 0.0f && (fastest == 0.0f || p < fastest)) {
+            fastest = p;
+        }
+    }
+    uint32_t period = 1000;
+    if (fastest > 0.0f) {
+        // A sub-millisecond period runs at the sweep's finest step, not at
+        // the fallback.
+        period = (fastest < 1.0f) ? 1u : static_cast<uint32_t>(fastest);
     }
 
     const bool due = mInjectPending || (periodic && (nowMs - mInjectLastMs >= period));
