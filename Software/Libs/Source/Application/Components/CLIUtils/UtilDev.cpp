@@ -38,16 +38,28 @@
 #include "main.h"
 #include "ff.h"
 
+#include "HeapStackMonitor.hpp"
+
 #include <atomic>
+#include <cstdint>
+#include <malloc.h>
 #include <memory>
 #include <new>
 #include <stdlib.h>
 #include <string.h>
 
+// From the system heap's allocator glue (heap_useNewlib_ST.cpp), as
+// HeapStackMonitor declares them.
+extern "C" size_t Heap_getSbrkHeadroom();
+extern "C" size_t Heap_getMinSbrkHeadroomEver();
+extern "C" size_t Heap_getImageReserved();
+extern "C" size_t Heap_isrStackHighWater();
+extern "C" size_t Heap_isrStackUsableSize();
+
 namespace {
 
 /// Bumped when a command or a reply changes.
-constexpr uint32_t kProtocolVersion = 3;
+constexpr uint32_t kProtocolVersion = 4;
 
 /// Read size for 'dev crc'.
 constexpr uint32_t kChunk = 256;
@@ -262,6 +274,73 @@ void crcOf(int argc, const char **argv)
 
     CLIConsole_print("#OK %lu %08lX\n", static_cast<unsigned long>(total),
                      static_cast<unsigned long>(crc));
+}
+
+// --- memory -----------------------------------------------------------------
+
+/// The memory figures HeapStackMonitor logs every 30 s, on demand, one
+/// "<what> key=value ..." line each, then a line per task. Bytes throughout.
+void mem()
+{
+    // System heap (newlib/dlmalloc over sbrk): free is the free space inside
+    // the allocator plus the headroom sbrk has never handed it; when the
+    // headroom reaches 0, only holes of fordblks can serve new allocations.
+    const struct mallinfo mi = mallinfo();
+    const size_t total    = HeapStackMonitor::GetSysHeapSize();
+    const size_t headroom = Heap_getSbrkHeadroom();
+    const size_t free     = mi.fordblks + headroom;
+    // HeapStackMonitor samples the least free every 3 s, so just after a big
+    // allocation (an app loading) its figure can still be above the free now.
+    // The lowest of the sample, the free now and what an earlier call reported,
+    // so the figure never goes up.
+    static size_t sLeastFreeSeen = SIZE_MAX;
+    size_t minEver = HeapStackMonitor::GetHeapSample()->minEverFree;
+    if (minEver == 0 || minEver > free) {
+        minEver = free;
+    }
+    if (minEver > sLeastFreeSeen) {
+        minEver = sLeastFreeSeen;
+    }
+    sLeastFreeSeen = minEver;
+
+    CLIConsole_print("sys_heap free=%u total=%u min_ever=%u peak_used=%u\n",
+                     static_cast<unsigned>(free),
+                     static_cast<unsigned>(total),
+                     static_cast<unsigned>(minEver),
+                     static_cast<unsigned>(total - Heap_getMinSbrkHeadroomEver()));
+    CLIConsole_print("sys_heap_detail sbrk_headroom=%u fordblks=%u ordblks=%u uordblks=%u "
+                     "keepcost=%u images=%u\n",
+                     static_cast<unsigned>(headroom), static_cast<unsigned>(mi.fordblks),
+                     static_cast<unsigned>(mi.ordblks), static_cast<unsigned>(mi.uordblks),
+                     static_cast<unsigned>(mi.keepcost),
+                     static_cast<unsigned>(Heap_getImageReserved()));
+    CLIConsole_print("os_heap free=%u total=%u min_ever=%u\n",
+                     static_cast<unsigned>(HeapStackMonitor::GetOsHeapFree()),
+                     static_cast<unsigned>(HeapStackMonitor::GetOsHeapSize()),
+                     static_cast<unsigned>(HeapStackMonitor::GetOsHeapWaterMark()));
+    CLIConsole_print("isr_stack used=%u usable=%u\n",
+                     static_cast<unsigned>(Heap_isrStackHighWater()),
+                     static_cast<unsigned>(Heap_isrStackUsableSize()));
+
+    // Tasks: the least stack each has had free (its high-water mark). A few
+    // spare slots for tasks created meanwhile.
+    const UBaseType_t room = uxTaskGetNumberOfTasks() + 4;
+    std::unique_ptr<TaskStatus_t[]> tasks(new (std::nothrow) TaskStatus_t[room]);
+    if (!tasks) {
+        fail("no memory for the task list");
+        return;
+    }
+    const size_t n = HeapStackMonitor::GetTasksInfo(tasks.get(), room);
+    static const char kStates[] = {'R', 'r', 'B', 'S', 'D', '?'};     // eTaskState order
+    for (size_t i = 0; i < n; ++i) {
+        const TaskStatus_t &t = tasks[i];
+        const size_t s = (t.eCurrentState < eInvalid) ? t.eCurrentState : 5;
+        CLIConsole_print("task stack_free_min=%u priority=%u state=%c name=%s\n",
+                         static_cast<unsigned>(t.usStackHighWaterMark * sizeof(StackType_t)),
+                         static_cast<unsigned>(t.uxCurrentPriority), kStates[s],
+                         t.pcTaskName);
+    }
+    ok();
 }
 
 // --- kernel update ----------------------------------------------------------
@@ -584,6 +663,8 @@ const char* Components::CliUtils::UtilDev::getHelp(ICLICommand_t* cmd)
         "                                   closes or developer mode goes off)\n"
         "  dev log on|off                   stream the log between commands,\n"
         "                                   framed by 0x1E ... 0x1F\n"
+        "  dev mem                          heap, stack and per-task memory,\n"
+        "                                   one key=value line each\n"
         "  dev update /Update/<file>.ota    install a kernel, as the phone app\n"
         "                                   does: the watch restarts into the\n"
         "                                   bootloader, which installs it\n"
@@ -638,6 +719,7 @@ void Components::CliUtils::UtilDev::execute(ICLICommand_t* cmd,
     else if (strcmp(sub, "sensor") == 0) { sensor(argc, argv); }
     else if (strcmp(sub, "log")    == 0) { log(argc, argv); }
     else if (strcmp(sub, "update") == 0) { update(argc, argv); }
+    else if (strcmp(sub, "mem")    == 0) { mem(); }
     else { fail("unknown command: see 'help dev'"); }
 }
 
