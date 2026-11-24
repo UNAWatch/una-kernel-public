@@ -743,9 +743,28 @@ bool Sensor::Driver::inject(const SDK::Sensor::Data::Field* values, uint16_t cou
         return false;
     }
 
-    if (!mMutex.lock(2000)) {
-        LOG_ERROR("failed to lock the mutex\n");
-        return false;
+    // An event-based driver holds one injected event, which the sweep
+    // publishes once. Two events close together would lose the first if the
+    // sweep had not taken it yet, so wait for it to: up to a second, after
+    // which the new one replaces it as before. Nothing is waited for while
+    // no listener is connected, as nothing is published then. The test and
+    // the store are one critical section; the lock is let go only to wait.
+    const uint32_t start = osKernelGetTickCount();
+    for (;;) {
+        if (!mMutex.lock(2000)) {
+            LOG_ERROR("failed to lock the mutex\n");
+            return false;
+        }
+
+        const bool waiting = (mMode == Mode::EVENT_BASED) && mInjectPending &&
+                             mInjected.load(std::memory_order_relaxed) && isActive() &&
+                             (osKernelGetTickCount() - start < pdMS_TO_TICKS(1000));
+        if (!waiting) {
+            break;
+        }
+
+        mMutex.release();
+        OS::Delay(10);
     }
     OS::MutexUnlocker unlocker(mMutex);
 

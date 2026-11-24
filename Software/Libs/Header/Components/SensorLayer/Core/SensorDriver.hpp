@@ -232,7 +232,9 @@ namespace Sensor
          *          driver, once per call for an event-based one. Listeners get
          *          them through the usual queues, so apps and kernel consumers
          *          alike see them. Nothing is published while no listener is
-         *          connected.
+         *          connected. On an event-based driver, waits up to a second
+         *          for the previous injected event to be published, so that
+         *          events injected close together are all delivered.
          *
          * @param  values  One value per field, in the type's field order.
          * @param  count   Must equal the driver's field count.
