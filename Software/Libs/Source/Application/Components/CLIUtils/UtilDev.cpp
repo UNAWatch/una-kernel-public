@@ -325,12 +325,32 @@ void mem()
     // Tasks: the least stack each has had free (its high-water mark). A few
     // spare slots for tasks created meanwhile.
     const UBaseType_t room = uxTaskGetNumberOfTasks() + 4;
+    struct Name {
+        char s[configMAX_TASK_NAME_LEN];
+    };
     std::unique_ptr<TaskStatus_t[]> tasks(new (std::nothrow) TaskStatus_t[room]);
-    if (!tasks) {
+    std::unique_ptr<Name[]>         names(new (std::nothrow) Name[room]);
+    if (!tasks || !names) {
         fail("no memory for the task list");
         return;
     }
+    // A task name lives in the task's own control block, which goes when the
+    // task does (an app unloaded meanwhile): the names are copied with the
+    // scheduler held, and printed from the copies once it runs again.
+    vTaskSuspendAll();
     const size_t n = HeapStackMonitor::GetTasksInfo(tasks.get(), room);
+    for (size_t i = 0; i < n; ++i) {
+        strncpy(names[i].s, tasks[i].pcTaskName, sizeof(names[i].s) - 1);
+        names[i].s[sizeof(names[i].s) - 1] = '\0';
+    }
+    xTaskResumeAll();
+
+    // Zero means more tasks than the room left for them were created since
+    // they were counted.
+    if (n == 0) {
+        fail("the task list changed while it was read: try again");
+        return;
+    }
     static const char kStates[] = {'R', 'r', 'B', 'S', 'D', '?'};     // eTaskState order
     for (size_t i = 0; i < n; ++i) {
         const TaskStatus_t &t = tasks[i];
@@ -338,7 +358,7 @@ void mem()
         CLIConsole_print("task stack_free_min=%u priority=%u state=%c name=%s\n",
                          static_cast<unsigned>(t.usStackHighWaterMark * sizeof(StackType_t)),
                          static_cast<unsigned>(t.uxCurrentPriority), kStates[s],
-                         t.pcTaskName);
+                         names[i].s);
     }
     ok();
 }
