@@ -752,4 +752,13 @@
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(ApplicationRoot)\generated\simulator\msvs\touchgfx_prebuild.targets"/>
   </ImportGroup>
+  <!-- UNA Watch housings for SDK/Simulator/WatchHAL.hpp (F4 cycles them).
+       Runs after TouchGFX's PostBuild, which copies the app's own landscape.png.
+       Copies nothing with an SDK that has no skins. -->
+  <Target Name="UnaWatchHousings" AfterTargets="PostBuild">
+    <ItemGroup>
+      <UnaSkins Include="$(ApplicationRoot)\..\..\..\SDK\Utilities\Simulator\Skins\landscape_*.png"/>
+    </ItemGroup>
+    <Copy SourceFiles="@(UnaSkins)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"/>
+  </Target>
 </Project>

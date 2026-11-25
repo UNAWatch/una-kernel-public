@@ -13,8 +13,8 @@ void SettingsClockFormatView::setupScreen()
 
     // Both modes have exactly two options; configure() fills the labels. The
     // shared item count relies on the two enums staying the same size.
-    static_assert(WatchSettingsLocal::Clock::Format::FMT_COUNT
-                      == WatchSettingsLocal::Clock::DateOrder::DATE_ORDER_COUNT,
+    static_assert(static_cast<int>(WatchSettingsLocal::Clock::Format::FMT_COUNT)
+                      == static_cast<int>(WatchSettingsLocal::Clock::DateOrder::DATE_ORDER_COUNT),
                   "Time-format and date-order pickers must have the same item count");
     menu.setNumberOfItems(WatchSettingsLocal::Clock::Format::FMT_COUNT);
 }

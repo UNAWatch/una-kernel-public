@@ -25,6 +25,12 @@ struct DeviceInfo {
     DeviceInfo() = default;
 
     /**
+     * @brief   Copy constructor. Declared because operator= is user-provided,
+     *          which makes the implicit one deprecated.
+     */
+    DeviceInfo(const DeviceInfo &other) = default;
+
+    /**
      * @brief   Constructor with parameters.
      * @param   name            Device name
      * @param   manufacturer    Device manufacturer
