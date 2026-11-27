@@ -1586,7 +1586,13 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
     // own picture of which clusters are free, and the two end up handing out
     // the same ones. The logs are closed first so nothing they hold is lost;
     // after release() any other access fails instead of writing.
-    suspendFileLoggers();
+    if (!suspendFileLoggers()) {
+        // Its writer is stuck in a file call and may write again once that
+        // returns: no handover until it has finished. Replugging tries again.
+        LOG_ERROR("System log busy; not opening MSD\n");
+        guiHandler(G2BEvent::MsdClose{});
+        return;
+    }
 
     // Read before the release. It counts only unplugs whose onDisconnect() has
     // returned, and reinit() compares it with every unplug detected (under the
@@ -2196,21 +2202,27 @@ void Backend::guiHandler(const G2BEvent::UsbReopenSet &evt)
     }
 }
 
-void Backend::suspendFileLoggers()
+bool Backend::suspendFileLoggers()
 {
-    // A log still suspended from a resume that failed stays as it is.
-    if (!mSystemLogSuspended && Component::SystemLogger::isStarted()) {
-        Component::SystemLogger::GetInstance().suspend();
+    // Called again for a log already suspended: it waits for a writer that an
+    // earlier suspend left busy.
+    bool quiet = true;
+    if (Component::SystemLogger::isStarted()) {
+        quiet = Component::SystemLogger::GetInstance().suspend();
         mSystemLogSuspended = true;
     }
     if (!mBatteryLogSuspended && mBatteryLogger) {
         // A failed suspend leaves the file open: its writes fail while the
         // host has the volume, and resume() starts a new file regardless.
+        // Unlike the system log, nothing is lost by its later writes failing
+        // (samples during the session are dropped anyway), so it does not
+        // hold the drive back.
         if (!mBatteryLogger->suspend()) {
             LOG_WARNING("Battery log not closed for the drive\n");
         }
         mBatteryLogSuspended = true;
     }
+    return quiet;
 }
 
 void Backend::resumeFileLoggers()

@@ -427,8 +427,10 @@ private:
     void reloadSettingsAfterMsd();
 
     /// Close the system and battery logs before the volume goes to the host,
-    /// and open new ones after it comes back. Backend thread only.
-    void suspendFileLoggers();
+    /// and open new ones after it comes back. Backend thread only. Suspend
+    /// returns false while the system log's writer is still busy in a file
+    /// call: the volume must not be handed over then.
+    bool suspendFileLoggers();
     void resumeFileLoggers();
 
     void guiHandler(const G2BEvent::MsdOpen &evt);

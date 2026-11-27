@@ -41,10 +41,13 @@ public:
     /**
      * @brief Write out what the LogBuffer holds and close the file, keeping
      *        the session. Lines logged from here on wait in the LogBuffer
-     *        (a gap marker covers any it drops) until resume(). No-op unless
-     *        running.
+     *        (a gap marker covers any it drops) until resume().
+     * @return false if the writer is still in a file call after the stop
+     *         timeout (it is left to finish, and may still write until it has;
+     *         call again to wait for it again); true once it has finished, or
+     *         if not running.
      */
-    void suspend();
+    bool suspend();
 
     /**
      * @brief Carry on draining into a new segment of the session.

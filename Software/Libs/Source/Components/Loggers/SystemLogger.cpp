@@ -207,29 +207,33 @@ bool SystemLogger::start()
     return true;
 }
 
-void SystemLogger::suspend()
+bool SystemLogger::suspend()
 {
     if (!mRunning) {
-        return;     // never started: the lock is not set up either
+        return true;    // never started: the lock is not set up either
     }
     OS::MutexCS cs(mLifecycle);
-    if (!mRunning || mSuspended) {
-        return;
+    if (!mRunning) {
+        return true;
     }
 
-    LogBuffer::setNotify(nullptr, nullptr);
-    mSuspended = true;
+    if (!mSuspended) {
+        LogBuffer::setNotify(nullptr, nullptr);
+        mSuspended = true;
+    }
 
     // The writer drains the source before it closes, so everything logged up
-    // to here is written and the cursor committed.
+    // to here is written and the cursor committed. Once it has, this returns
+    // at once; called again after a timeout, it waits for the worker again.
     if (!mWriter.stop()) {
-        // Stuck in a file call, maybe holding the volume lock: left to finish
-        // (release() cannot take the volume from it meanwhile), and resume()
-        // fails until it has, to be tried again on the next close.
-        LOG_ERROR("writer still busy; suspended without it finishing\n");
-        return;
+        // Stuck in a file call: left to finish. Until it has, it may still
+        // write, so the volume must not be handed over; resume() fails until
+        // then, and is tried again on the next close.
+        LOG_ERROR("writer still busy\n");
+        return false;
     }
     LOG_INFO("suspended\n");
+    return true;
 }
 
 bool SystemLogger::resume()
