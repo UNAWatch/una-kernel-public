@@ -1595,6 +1595,16 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
 
     UsbDevice::GetInstance().reinit(true, FLASH_DISK_USR);
 
+    // The cable left before the enable, so mass storage stayed off and the
+    // host cannot reach the volume. If the unplug's close has run already,
+    // nothing else would take the volume back or bring the logs and apps back
+    // until the next unplug: close now, as it does.
+    if (!UsbDevice::GetInstance().isMscEnabled()) {
+        LOG_WARNING("MSD not opened: no cable\n");
+        guiHandler(G2BEvent::MsdClose{});
+        return;
+    }
+
     OS::Delay(100); // TOTO: Fix App manager
 }
 

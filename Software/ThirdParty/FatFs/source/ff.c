@@ -3625,9 +3625,10 @@ static FRESULT validate (	/* Returns FR_OK or FR_INVALID_OBJECT */
 	if (obj && obj->fs && obj->fs->fs_type && obj->id == obj->fs->id) {	/* Test if the object is valid */
 #if FF_FS_REENTRANT
 		if (lock_volume(obj->fs, 0)) {	/* Take a grant to access the volume */
-			/* UNA: the volume can be remounted (a new id) while this waited for
-			   the lock, e.g. taken back from the USB host; recheck the id under it */
-			if (obj->id == obj->fs->id && !(disk_status(obj->fs->pdrv) & STA_NOINIT)) { /* Test if the hosting phsical drive is kept initialized */
+			/* UNA: the volume can be remounted (a new id), or fail to remount
+			   (fs_type 0, same id), while this waited for the lock, e.g. taken
+			   back from the USB host; recheck both under it */
+			if (obj->fs->fs_type && obj->id == obj->fs->id && !(disk_status(obj->fs->pdrv) & STA_NOINIT)) { /* Test if the hosting phsical drive is kept initialized */
 				res = FR_OK;
 			} else {
 				unlock_volume(obj->fs, FR_OK);	/* Invalidated volume, abort to access */

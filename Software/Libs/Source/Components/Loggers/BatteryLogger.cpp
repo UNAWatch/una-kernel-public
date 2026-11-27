@@ -133,13 +133,16 @@ bool BatteryLogger::suspend()
         return false;
     }
 
+    // Requests are handled in order, so this one is done once this many are.
+    // Counted before the push, so the worker never sees more handled than
+    // queued (suspend() is only called from one thread).
+    const uint32_t mine = ++mDriveOpenQueued;
     constexpr uint32_t kTimeoutMs = 2000;
     if (!mQueue.push(Reason::DRIVE_OPEN, kTimeoutMs)) {
+        --mDriveOpenQueued;
         LOG_ERROR("suspend dropped (queue full)\n");
         return false;
     }
-    // Requests are handled in order, so this one is done once this many are.
-    const uint32_t mine = ++mDriveOpenQueued;
 
     // A request that timed out earlier can be handled (and given) at any
     // point, so each give only prompts another look at the count.
@@ -226,16 +229,22 @@ void BatteryLogger::thread()
             continue;
         }
 
-        // Not on DRIVE_OPEN: one whose suspend() timed out can come after the
-        // resume() that set the flag, and would take it, reopen the file and
-        // close it again, leaving nothing to open it after the session.
-        if (r != Reason::DRIVE_OPEN && mReopenPending.exchange(false)) {
+        // Not while a DRIVE_OPEN is still queued or being handled: one whose
+        // suspend() timed out can come after the resume() that set the flag,
+        // and records ahead of it would take the flag, reopen the file, and
+        // leave it to that DRIVE_OPEN to close it with nothing to reopen it.
+        const bool driveOpenOutstanding =
+                mDriveOpenDone.load() != mDriveOpenQueued.load();
+        if (!driveOpenOutstanding && mReopenPending.exchange(false)) {
             // Closed for DRIVE_OPEN, or left open with an object the volume's
             // remount invalidated if that suspend failed: start a new file
             // either way.
             mLogger.close();
             if (!mLogger.open()) {
+                // Owed still: the next record tries again (a periodic one at
+                // the latest), so a lasting failure logs once a period.
                 LOG_ERROR("Logger reopen failed\n");
+                mReopenPending = true;
             }
         }
 

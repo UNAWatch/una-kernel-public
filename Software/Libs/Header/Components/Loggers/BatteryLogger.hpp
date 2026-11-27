@@ -127,8 +127,9 @@ private:
     std::atomic<uint32_t>                         mDriveOpenDone{0};
     OS::Semaphore                                 mDriveOpenHandled{1, 0};
 
-    // Set by resume(), taken by the worker on its next wake: a new file is
-    // owed even if the DRIVE_CLOSED record could not be queued.
+    // Set by resume(), taken by the worker on the first record it handles with
+    // no DRIVE_OPEN outstanding: a new file is owed even if the DRIVE_CLOSED
+    // record could not be queued. Set again if the reopen fails.
     std::atomic<bool>                             mReopenPending{false};
 
     // Monotonic record counter, resets to 0 on boot. Combined with the file's
