@@ -223,6 +223,15 @@ bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk)
         return false;
     }
 
+    // Under the lock onUsbDetected() takes: a cable pulled before this has
+    // cleared mPortType, so mass storage stays off; one pulled after finds it
+    // on and the disconnect takes it off. Never on with no cable, as nothing
+    // would take it off before a replug handed the host the volume.
+    if (mscEnable && mPortType == DRIVER_USB_PORT_NONE) {
+        LOG_WARNING("reinit: no cable, mass storage left off\n");
+        mscEnable = false;
+    }
+
     // Remember if stack was running - restore state after reinit
     bool wasOn = mIsOn;
 

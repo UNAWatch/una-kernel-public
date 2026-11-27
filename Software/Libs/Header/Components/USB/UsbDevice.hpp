@@ -113,7 +113,8 @@ public:
      *          Can be called while USB is connected to PC - host will
      *          see a short reconnect and remount with new configuration.
      *          PHY and Sleep state are preserved across the call.
-     * @param   mscEnable: Enable Mass Storage class.
+     * @param   mscEnable: Enable Mass Storage class. Ignored (left off) when
+     *          no cable is attached.
      * @param   mscDisk: Mass Storage disk index.
      * @retval  true if success, false otherwise.
      */

@@ -226,7 +226,10 @@ void BatteryLogger::thread()
             continue;
         }
 
-        if (mReopenPending.exchange(false)) {
+        // Not on DRIVE_OPEN: one whose suspend() timed out can come after the
+        // resume() that set the flag, and would take it, reopen the file and
+        // close it again, leaving nothing to open it after the session.
+        if (r != Reason::DRIVE_OPEN && mReopenPending.exchange(false)) {
             // Closed for DRIVE_OPEN, or left open with an object the volume's
             // remount invalidated if that suspend failed: start a new file
             // either way.
