@@ -155,6 +155,11 @@ public:
 
     /**
      * @brief   Remove directory with whole its content.
+     * @details A subdirectory whose entry opens as the volume's root (a
+     *          damaged entry with start cluster 0) is left alone, with the
+     *          folders that hold it, and the rest is removed; the call then
+     *          returns 'false'. A @p path that opens as the root without
+     *          naming it is left alone the same way.
      * @param   path: Path to the directory.
      * @retval  'true' if the directory was successfully removed,
      *          'false' otherwise.
@@ -183,7 +188,8 @@ private:
     static FRESULT deleteNode(TCHAR*              path,
                               UINT                sz_buff,
                               FILINFO*            fno,
-                              const RemoveFilter& filter);
+                              const RemoveFilter& filter,
+                              uint32_t&           skipped);
 
     // Directory object
     DIR mDir { };
