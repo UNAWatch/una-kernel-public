@@ -21,14 +21,30 @@ $(error Spaces not allowed in path)
 else
 
 ADDITIONAL_SOURCES := 
-ADDITIONAL_INCLUDE_PATHS := 
+# The same extra include paths as simulator/msvs/Application.vcxproj
+ADDITIONAL_INCLUDE_PATHS := ../../../SDK/Libs/Header ../../Libs/Header ../../ThirdParty/Nayuki
 ADDITIONAL_LIBRARY_PATHS := 
 ADDITIONAL_LIBRARIES :=
 export ADDITIONAL_SOURCES ADDITIONAL_INCLUDE_PATHS ADDITIONAL_LIBRARY_PATHS ADDITIONAL_LIBRARIES
 
+# MinGW only: unoptimised, gui/src/model/Model.cpp instantiates so many
+# std::variant helpers that the section names overflow the COFF string table
+# ("file too big", even with -Wa,-mbig-obj). -Og inlines most of them and
+# keeps the build debuggable. It is added to the user_cflags TouchGFX
+# Designer writes in config/gcc/app.mk, through a gcc response file: MinGW
+# make splits a command-line value with a space when it passes it on.
+ifeq ($(OS),Windows_NT)
+-include $(application_path)/config/gcc/app.mk
+user_cflags_file := build/user_cflags.rsp
+extra_make_vars := user_cflags=@$(user_cflags_file)
+endif
+
 all: $(filter assets,$(MAKECMDGOALS))
 all assets: $(filter clean,$(MAKECMDGOALS))
 all clean assets:
-	@$(MAKE) -r -f generated/simulator/gcc/Makefile -s $(MFLAGS) $@ -C "$(application_path)"
+ifeq ($(OS),Windows_NT)
+	@mkdir -p "$(application_path)/build" && echo '$(user_cflags) -Og' > "$(application_path)/$(user_cflags_file)"
+endif
+	@$(MAKE) -r -f generated/simulator/gcc/Makefile -s $(MFLAGS) $(extra_make_vars) $@ -C "$(application_path)"
 endif
 

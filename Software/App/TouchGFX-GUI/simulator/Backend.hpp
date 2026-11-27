@@ -50,7 +50,7 @@ public:
             std::visit([this](auto &&value) {
                 using T = std::decay_t<decltype(value)>;
                 if constexpr (std::is_same_v<T, std::monostate>) {
-                    break;
+                    return;
                 } else if constexpr (std::is_same_v<T, G2BEvent::SettingsLocal>) {
                     // Kept, so the sleep answer below does not hand the GUI
                     // back settings older than the ones it just saved.
@@ -800,7 +800,7 @@ private:
             for (uint8_t i = 0; i < d.count; i++) {
                 d.ctrls[i] = mUI.data()[i];
             }
-            snprintf(d.altname, sizeof(d.altname), mAltName);
+            snprintf(d.altname, sizeof(d.altname), "%s", mAltName);
 
             return d;
         }
@@ -825,7 +825,7 @@ private:
         void createGlance(const char* name)
         {
             GlanceProvider& data = *this;
-            snprintf(data.mAltName, sizeof(data.mAltName), name);
+            snprintf(data.mAltName, sizeof(data.mAltName), "%s", name);
 
             // first row
             data.mUI.createRect().init(
