@@ -63,6 +63,10 @@
 
 namespace {
 
+// The FatFs volume the USB drive exposes: UNA WATCH, USER_ROOT_DIR ("2:"),
+// FLASH_DISK_USR in the disk layer.
+constexpr uint8_t kUserVolume = 2;
+
 // Push the user-configured moderate-intensity HR cutoff into the
 // activity-minute tracker's HR path. The zone-1 upper bound
 // (heartRateZones.thresholds[0], ~50% HRmax) is the WHO lower bound of
@@ -1578,6 +1582,17 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
 
     App::Manager::GetInstance().stopAll();
 
+    // The host and the watch must not both write the volume: each keeps its
+    // own picture of which clusters are free, and the two end up handing out
+    // the same ones. The logs are closed first so nothing they hold is lost;
+    // after release() any other access fails instead of writing.
+    suspendFileLoggers();
+    if (!FS::FileSystem::GetInstance().release(kUserVolume)) {
+        LOG_ERROR("Volume busy; not opening MSD\n");
+        guiHandler(G2BEvent::MsdClose{});
+        return;
+    }
+
     UsbDevice::GetInstance().reinit(true, FLASH_DISK_USR);
 
     OS::Delay(100); // TOTO: Fix App manager
@@ -1585,6 +1600,17 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
 
 void Backend::guiHandler(const G2BEvent::MsdClose &evt)
 {
+    // An unplug and `usb drive off` have taken mass storage off and the volume
+    // back already. This covers an open handled after the unplug that posted
+    // this close, and an open that gave up: mass storage first, so the host
+    // cannot reach the volume once it is taken back. Done again it would
+    // re-enumerate the device, hence the check.
+    if (UsbDevice::GetInstance().isMscEnabled()) {
+        UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
+    }
+    FS::FileSystem::GetInstance().reclaim(kUserVolume);
+    resumeFileLoggers();
+
     DailyHealth::Service& dhm = Instance::DailyHealthService::getInstance().getService();
     dhm.notifyMsdMode(false);
 
@@ -1600,13 +1626,6 @@ void Backend::guiHandler(const G2BEvent::MsdClose &evt)
     mgr.autoRun();
 
     OS::Delay(100); // TOTO: Fix App manager
-
-    // After an unplug USB is disabled, so reinit is a light one. After
-    // `usb drive off` the drive was taken from the host already; doing it
-    // again would re-enumerate the device a second time.
-    if (UsbDevice::GetInstance().isMscEnabled()) {
-        UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
-    }
 
     mMsdOpen = false;
     sendEventToGui(B2GEvent::MsdState{false});
@@ -2067,7 +2086,14 @@ void Backend::onDisconnect()
     // A new plug-in opens the drive again.
     mMsdHeld = false;
 
-    // The cable is out, so the host can no longer reach the volume.
+    // The cable is out, so the host can no longer reach the volume. Mass
+    // storage comes off here, not in the MsdClose handler, so a replug before
+    // that runs cannot hand the host the volume taken back below. USB is
+    // stopped, so this is a light reinit.
+    if (UsbDevice::GetInstance().isMscEnabled()) {
+        UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
+    }
+    FS::FileSystem::GetInstance().reclaim(kUserVolume);
     reloadSettingsAfterMsd();
 
     // Last, because the handler brings the apps back and runs on another
@@ -2118,6 +2144,7 @@ void Backend::guiHandler(const G2BEvent::MsdCloseByHand &evt)
     // reload and the apps below cannot write the volume while the host still
     // has it. The host configuring the device again finds mMsdHeld set.
     UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
+    FS::FileSystem::GetInstance().reclaim(kUserVolume);
 
     reloadSettingsAfterMsd();
 
@@ -2149,6 +2176,38 @@ void Backend::guiHandler(const G2BEvent::UsbReopenSet &evt)
     } else {
         LOG_ERROR("usbCfg.reopenAfterReset not saved\n");
         mReopenResult = ReopenResult::SaveFailed;
+    }
+}
+
+void Backend::suspendFileLoggers()
+{
+    if (mFileLoggersSuspended) {
+        return;
+    }
+    mFileLoggersSuspended = true;
+
+    if (Component::SystemLogger::isStarted()) {
+        Component::SystemLogger::GetInstance().suspend();
+    }
+    // A failed suspend leaves the file open: its writes fail while the host
+    // has the volume, and resume() starts a new file regardless.
+    if (mBatteryLogger && !mBatteryLogger->suspend()) {
+        LOG_WARNING("Battery log not closed for the drive\n");
+    }
+}
+
+void Backend::resumeFileLoggers()
+{
+    if (!mFileLoggersSuspended) {
+        return;
+    }
+    mFileLoggersSuspended = false;
+
+    if (Component::SystemLogger::isStarted()) {
+        Component::SystemLogger::GetInstance().resume();
+    }
+    if (mBatteryLogger) {
+        mBatteryLogger->resume();
     }
 }
 

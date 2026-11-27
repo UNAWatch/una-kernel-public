@@ -416,9 +416,18 @@ private:
     /// Set by the UsbReopenSet handler, read by the CLI thread.
     std::atomic<ReopenResult> mReopenResult {ReopenResult::Saved};
 
+    /// The system and battery loggers were suspended for the drive and not
+    /// resumed yet. Backend thread only.
+    bool mFileLoggersSuspended = false;
+
     /// Reload the settings the host may have edited over the drive. Only once
     /// the host can no longer reach the volume.
     void reloadSettingsAfterMsd();
+
+    /// Close the system and battery logs before the volume goes to the host,
+    /// and open new ones after it comes back. Backend thread only.
+    void suspendFileLoggers();
+    void resumeFileLoggers();
 
     void guiHandler(const G2BEvent::MsdOpen &evt);
     void guiHandler(const G2BEvent::MsdClose &evt);

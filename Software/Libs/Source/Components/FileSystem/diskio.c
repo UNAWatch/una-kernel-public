@@ -58,6 +58,37 @@ PARTITION VolToPart[] =
 };
 #endif
 
+/*
+ * A volume handed to the USB host is a removed medium as far as FatFs is
+ * concerned. sReleased: the host has it, so FatFs may not initialise it.
+ * sStale: FatFs's picture of the volume (cached sector, allocation hints) may
+ * no longer match it. Both are set by disk_release(); disk_reclaim() clears
+ * sReleased, and sStale is cleared by the next disk_initialize(), which FatFs
+ * calls when it remounts the volume on its first access after the reclaim.
+ * Both are read by FatFs with the volume lock held.
+ */
+static volatile uint8_t sReleased[FF_VOLUMES];
+static volatile uint8_t sStale[FF_VOLUMES];
+
+void disk_release (
+	BYTE pdrv		/* Physical drive number to identify the drive */
+)
+{
+    if (pdrv < FF_VOLUMES) {
+        sStale[pdrv]    = 1;
+        sReleased[pdrv] = 1;
+    }
+}
+
+void disk_reclaim (
+	BYTE pdrv		/* Physical drive number to identify the drive */
+)
+{
+    if (pdrv < FF_VOLUMES) {
+        sReleased[pdrv] = 0;
+    }
+}
+
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */
 /*-----------------------------------------------------------------------*/
@@ -67,6 +98,9 @@ DSTATUS disk_status (
 )
 {
     if (pdrv < FF_VOLUMES) {
+        if (sStale[pdrv]) {
+            return STA_NOINIT;
+        }
         return flash_diskio_status(skDiskMap[pdrv]) ? RES_OK : RES_PARERR;
     } else {
         return RES_PARERR;
@@ -84,8 +118,14 @@ DSTATUS disk_initialize (
 )
 {
     if (pdrv < FF_VOLUMES) {
-        return flash_diskio_initialize(skDiskMap[pdrv])
-                ? RES_OK : RES_PARERR;
+        if (sReleased[pdrv]) {
+            return STA_NOINIT;
+        }
+        if (!flash_diskio_initialize(skDiskMap[pdrv])) {
+            return RES_PARERR;
+        }
+        sStale[pdrv] = 0;
+        return RES_OK;
     } else {
         return RES_PARERR;
     }

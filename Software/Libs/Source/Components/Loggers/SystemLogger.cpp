@@ -158,6 +158,11 @@ bool SystemLogger::start()
         return true;
     }
 
+    if (!mLifecycle.init("SysLogLife")) {
+        LOG_ERROR("failed to create the lifecycle lock\n");
+        return false;
+    }
+
     // Validate/seed the no-init cursor. On a cold boot (or layout change) start
     // from the oldest byte still in the ring; otherwise keep the survived value.
     if (sCursor.magic != kCursorMagic) {
@@ -202,14 +207,72 @@ bool SystemLogger::start()
     return true;
 }
 
+void SystemLogger::suspend()
+{
+    if (!mRunning) {
+        return;     // never started: the lock is not set up either
+    }
+    OS::MutexCS cs(mLifecycle);
+    if (!mRunning || mSuspended) {
+        return;
+    }
+
+    LogBuffer::setNotify(nullptr, nullptr);
+    mSuspended = true;
+
+    // The writer drains the source before it closes, so everything logged up
+    // to here is written and the cursor committed.
+    mWriter.stop();
+    LOG_INFO("suspended\n");
+}
+
+void SystemLogger::resume()
+{
+    if (!mRunning) {
+        return;
+    }
+    OS::MutexCS cs(mLifecycle);
+    if (!mRunning || !mSuspended) {
+        return;
+    }
+
+    char path[128];
+    if (!mNaming.nextPath(path, sizeof(path))) {
+        LOG_ERROR("failed to build the next segment path\n");
+        return;
+    }
+    if (!mWriter.start(path, true /* override */, skFlushIntervalMs)) {
+        LOG_ERROR("failed to restart the writer\n");
+        return;
+    }
+
+    mSuspended = false;
+    LogBuffer::setNotify(&SystemLogger::notifyTrampoline, this);
+    mWriter.notifyData();   // kick: drain what was logged while suspended
+    LOG_INFO("resumed\n");
+}
+
 void SystemLogger::stop()
 {
+    if (!mRunning) {
+        return;
+    }
+    // A shutdown (Power) can stop the logger while the Backend suspends it.
+    OS::MutexCS cs(mLifecycle);
     if (!mRunning) {
         return;
     }
 
     LogBuffer::setNotify(nullptr, nullptr);
     mRunning = false;
+
+    if (mSuspended) {
+        // The writer is stopped and its file closed already. What was logged
+        // since stays in the LogBuffer, behind the persisted cursor.
+        mSuspended = false;
+        sStarted   = false;
+        return;
+    }
 
     // Ask the source to append a shutdown marker after the last data, then stop:
     // the writer's shutdown drain pulls the remaining buffer + marker, f_syncs

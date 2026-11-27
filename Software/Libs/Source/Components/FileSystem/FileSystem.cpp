@@ -35,6 +35,10 @@
 extern const char* skDiskLabel[];
 #endif
 
+// Defined in diskio.c
+extern "C" void disk_release(BYTE pdrv);
+extern "C" void disk_reclaim(BYTE pdrv);
+
 namespace FS
 {
 
@@ -139,6 +143,37 @@ void FileSystem::unmount()
             LOG_DEBUG("'%s' unmounted\n", sVolumePath[i]);
         }
     }
+}
+
+bool FileSystem::release(uint8_t vol)
+{
+    if (vol >= skVolumes) {
+        return false;
+    }
+
+    // Under the lock FatFs takes for every call on the volume (ff_mutex_take()),
+    // so no call is running on it while it is handed over, and every call after
+    // finds it handed over.
+    constexpr uint32_t kTimeoutMs = 5000;
+    osMutexId_t mutex = getMutex(vol);
+    if (osMutexAcquire(mutex, pdMS_TO_TICKS(kTimeoutMs)) != osOK) {
+        LOG_ERROR("'%s' still busy, not handed over\n", sVolumePath[vol]);
+        return false;
+    }
+    disk_release(vol);
+    osMutexRelease(mutex);
+
+    LOG_INFO("'%s' handed over\n", sVolumePath[vol]);
+    return true;
+}
+
+void FileSystem::reclaim(uint8_t vol)
+{
+    if (vol >= skVolumes) {
+        return;
+    }
+
+    disk_reclaim(vol);
 }
 
 bool FileSystem::format(uint8_t vol)

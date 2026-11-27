@@ -118,6 +118,31 @@ public:
     void unmount();
 
     /**
+     * @brief   Hand a volume over to the USB host.
+     * @details From here until reclaim(), every FatFs access to the volume
+     *          fails with FR_NOT_READY (FR_INVALID_OBJECT for an object opened
+     *          before), so the firmware cannot write it while the host does.
+     *          Returns once no FatFs call that was already running on the
+     *          volume is still running. Close the files that should survive
+     *          before calling this: their unsaved data is lost.
+     * @param   vol: Volume to hand over. (0 .. FF_VOLUMES-1)
+     * @retval  'true' once the volume is the host's. 'false' if a call already
+     *          running on it did not finish in time; the volume then stays the
+     *          firmware's and must not be handed to the host.
+     */
+    bool release(uint8_t vol);
+
+    /**
+     * @brief   Take a volume back from the USB host.
+     * @details FatFs reads the volume again on its first access after this,
+     *          so it starts from what the host left rather than from what it
+     *          had cached. Call it only once the host can no longer write the
+     *          volume. Safe to call for a volume that was not handed over.
+     * @param   vol: Volume to take back. (0 .. FF_VOLUMES-1)
+     */
+    void reclaim(uint8_t vol);
+
+    /**
      * @brief   Get number of the volumes.
      * @retval  Number of the drives.
      */
