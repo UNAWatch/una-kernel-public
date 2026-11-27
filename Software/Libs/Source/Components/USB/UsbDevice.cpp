@@ -68,6 +68,7 @@ void UsbDevice::onUsbDetected(bool state)
         }
         DriverUsb_PhyDisable();
         mPortType = DRIVER_USB_PORT_NONE;
+        ++mUnplugs;     // under the lock, before onDisconnect() is told
     }
 
     DriverUsb_PortType_t portType = mPortType;
@@ -96,6 +97,9 @@ void UsbDevice::onUsbDetected(bool state)
         }
     } else {
         mObserver.notify(&Callback::onDisconnect);
+        // Only now: until the observers have taken back what the host had,
+        // reinit() must not count this unplug as dealt with.
+        ++mUnplugsReported;
     }
 }
 
@@ -213,7 +217,23 @@ bool UsbDevice::deinit()
     return true;
 }
 
-bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk)
+void UsbDevice::disableMscThen(const std::function<void()>& then)
+{
+    // The lock is recursive, so reinit() can take it again inside.
+    const bool locked = lock();
+    if (mIsMscEnabled) {
+        reinit(false, mMscDisk);
+    }
+    if (then) {
+        then();
+    }
+    if (locked) {
+        unlock();
+    }
+}
+
+bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk,
+        std::optional<uint32_t> unplugsSeen)
 {
     if (!mIsInit) {
         return false;
@@ -221,6 +241,23 @@ bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk)
 
     if (!lock()) {
         return false;
+    }
+
+    // Under the lock onUsbDetected() takes: a cable pulled before this has
+    // cleared mPortType, so mass storage stays off; one pulled after finds it
+    // on and the disconnect takes it off. Never on with no cable, as nothing
+    // would take it off before a replug handed the host the volume.
+    if (mscEnable && mPortType == DRIVER_USB_PORT_NONE) {
+        LOG_WARNING("reinit: no cable, mass storage left off\n");
+        mscEnable = false;
+    }
+    // Likewise a cable pulled (and maybe replugged) since the caller looked,
+    // or still being reported when it looked (getUnplugCount() counts only
+    // reported ones): what the caller prepared for this host, the unplug may
+    // have undone.
+    if (mscEnable && unplugsSeen && *unplugsSeen != mUnplugs.load()) {
+        LOG_WARNING("reinit: unplugged since, mass storage left off\n");
+        mscEnable = false;
     }
 
     // Remember if stack was running - restore state after reinit

@@ -38,6 +38,25 @@ public:
     /** @brief Flush, write the shutdown marker and close the session file. */
     void stop();
 
+    /**
+     * @brief Write out what the LogBuffer holds and close the file, keeping
+     *        the session. Lines logged from here on wait in the LogBuffer
+     *        (a gap marker covers any it drops) until resume().
+     * @return false if the writer is still in a file call after the stop
+     *         timeout (it is left to finish, and may still write until it has;
+     *         call again to wait for it again); true once it has finished, or
+     *         if not running.
+     */
+    bool suspend();
+
+    /**
+     * @brief Carry on draining into a new segment of the session.
+     * @return false if the segment could not be named or the writer not
+     *         restarted (still suspended: call again); true otherwise,
+     *         including when there was nothing to resume.
+     */
+    bool resume();
+
     bool isRunning() const { return mRunning; }
 
     /** @brief Whether started, without constructing the singleton (shutdown use). */
@@ -86,6 +105,11 @@ private:
     bool     mShutdownPending = false;
     bool     mShutdownDone    = false;
     bool     mRunning         = false;
+    bool     mSuspended       = false;
+
+    // Serialises stop(), suspend() and resume(): a shutdown stops the logger
+    // from the Power thread, the drive suspends it from the Backend's.
+    OS::Mutex mLifecycle;
 };
 
 }  // namespace Component

@@ -22,6 +22,34 @@
 namespace FS
 {
 
+namespace {
+
+// Whether @p path names a volume's root: "2:", "2:/".
+bool isVolumeRoot(const TCHAR* path)
+{
+    const TCHAR* p = strchr(path, ':');
+    p = p ? p + 1 : path;
+    while (*p == _T('/')) {
+        ++p;
+    }
+    return *p == 0;
+}
+
+// Whether the open directory @p dir is the volume's root, whatever its path
+// says. FatFs reads a start cluster of 0 as the root (dir_sdi()), so a damaged
+// entry that holds 0 (or the root's own cluster) lists the root, and a
+// recursive delete would go round through the whole volume.
+bool opensAsRoot(const DIR& dir)
+{
+    const FATFS* fs = dir.obj.fs;
+    if (dir.obj.sclust == 0) {
+        return true;
+    }
+    return fs->fs_type >= FS_FAT32 && dir.obj.sclust == static_cast<DWORD>(fs->dirbase);
+}
+
+} // namespace
+
 Directory::Directory(const char *path)
 {
     assert(path != nullptr);
@@ -244,11 +272,18 @@ bool Directory::RemoveRecursively(const char*  path,
     normalize(buff);
 
     FILINFO fno = {};
+    uint32_t skipped = 0;
 
-    const FRESULT fr = deleteNode(buff, FF_MAX_LFN, &fno, filter);
+    const FRESULT fr = deleteNode(buff, FF_MAX_LFN, &fno, filter, skipped);
 
     if (fr != FR_OK) {
         LOG_ERROR("Err [%s] Path: %s\n", ERRSTR(fr), path);
+        return false;
+    }
+
+    if (skipped != 0) {
+        LOG_ERROR("%lu entries not deleted. Path: %s\n",
+                  static_cast<unsigned long>(skipped), path);
         return false;
     }
 
@@ -292,9 +327,13 @@ bool Directory::Create(const char *path)
  * @param[in] filter
  *     Optional callback used to decide whether an entry should be deleted.
  *     Signature: <tt>bool(const TCHAR* path, const FILINFO* fno)</tt>.
+ * @param[in,out] skipped
+ *     Incremented when @p path, or a subdirectory under it, is left alone because
+ *     its entry opens as the volume's root (a damaged entry). The folders that
+ *     hold one are kept too.
  *
  * @return FatFs result code:
- *     - @c FR_OK on success
+ *     - @c FR_OK on success, including when entries were skipped (see @p skipped)
  *     - otherwise an error code returned by FatFs (e.g., @c FR_DENIED, @c FR_INVALID_PARAMETER, ...)
  *
  * @warning
@@ -307,7 +346,8 @@ bool Directory::Create(const char *path)
 FRESULT Directory::deleteNode(TCHAR*              path,
                               UINT                sz_buff,
                               FILINFO*            fno,
-                              const RemoveFilter& filter)
+                              const RemoveFilter& filter,
+                              uint32_t&           skipped)
 {
     FRESULT fr;
     DIR dir;
@@ -318,6 +358,15 @@ FRESULT Directory::deleteNode(TCHAR*              path,
     if (fr != FR_OK) {
         LOG_ERROR("f_opendir failed. Err [%s] Path: %s\n", ERRSTR(fr), path);
         return fr;
+    }
+
+    if (opensAsRoot(dir) && !isVolumeRoot(path)) {
+        // Going in would delete from the root, and unlinking it would check the
+        // root for emptiness. Leave it; the caller keeps the folders holding it.
+        LOG_ERROR("Skipped: the entry points at the root. Path: %s\n", path);
+        f_closedir(&dir);
+        ++skipped;
+        return FR_OK;
     }
 
     const size_t baseLen = strlen(path);
@@ -377,13 +426,15 @@ FRESULT Directory::deleteNode(TCHAR*              path,
         const bool wantDelete = filter ? filter(path, fno) : true;
 
         if (fno->fattrib & AM_DIR) {
-            fr = deleteNode(path, sz_buff, fno, filter);
+            const uint32_t skippedBefore = skipped;
+            fr = deleteNode(path, sz_buff, fno, filter, skipped);
             if (fr != FR_OK) {
                 LOG_ERROR("Failed while processing subdir. Err [%s] Path: %s\n", ERRSTR(fr), path);
                 break;
             }
 
-            if (wantDelete) {
+            // A folder that kept a skipped entry is not empty.
+            if (wantDelete && skipped == skippedBefore) {
                 fr = f_unlink(path);
                 if (fr != FR_OK) {
                     LOG_ERROR("unlink folder failed. Err [%s] Path: %s attr=0x%02X\n", ERRSTR(fr), path, fno->fattrib);

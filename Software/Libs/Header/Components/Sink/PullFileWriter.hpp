@@ -31,7 +31,7 @@ public:
     /** @brief Peek: whether the source has bytes to write, without consuming. */
     using AvailFn = bool (*)(void* ctx);
 
-    ~PullFileWriter() override { stop(); }
+    ~PullFileWriter() override { stop(kWaitForever); }
 
     /** @brief Set the data source. Call before start(). */
     void setSource(SourceFn fn, void* ctx)

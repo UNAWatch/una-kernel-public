@@ -23,7 +23,7 @@ AsyncFileWriter::~AsyncFileWriter()
 {
     // Backstop only. Subclasses must stop() in their own destructor so the
     // worker stops touching produce() before the subclass part is destroyed.
-    stop();
+    stop(kWaitForever);
 }
 
 void AsyncFileWriter::setRollover(uint32_t maxSegmentBytes, NextPathFn nextPath, void* ctx)
@@ -52,6 +52,17 @@ bool AsyncFileWriter::start(const char* path, bool override, uint32_t flushInter
         return false;
     }
 
+    // A worker a stop() left busy owns the thread object (and mPath) until it
+    // exits: not before then.
+    if (mStopPending) {
+        if (!mThread.join(0)) {
+            LOG_ERROR("previous worker still busy: %s\n", mPath);
+            return false;
+        }
+        mThread.deinit();
+        mStopPending = false;
+    }
+
     std::snprintf(mPath, sizeof(mPath), "%s", path);
     mOverride        = override;
     mFlushIntervalMs = flushIntervalMs;
@@ -64,13 +75,28 @@ bool AsyncFileWriter::start(const char* path, bool override, uint32_t flushInter
     return true;
 }
 
-bool AsyncFileWriter::stop()
+bool AsyncFileWriter::stop(uint32_t timeoutMs)
 {
+    if (mThread.getId() == nullptr) {
+        return true;    // never started, or stopped already
+    }
+
     mThread.requestStop();
     mWork.give();          // wake the worker so it observes the stop request
-    mThread.join(5000);
-    mThread.deinit();
 
+    // Never killed on a timeout (see the header): left to exit on its own.
+    constexpr uint32_t kRoundMs = 5000;
+    while (!mThread.join(timeoutMs == kWaitForever ? kRoundMs : timeoutMs)) {
+        if (timeoutMs != kWaitForever) {
+            LOG_ERROR("worker still busy, left to finish: %s\n", mPath);
+            mStopPending = true;
+            return false;
+        }
+        LOG_WARNING("still waiting for the worker: %s\n", mPath);
+    }
+
+    mThread.deinit();
+    mStopPending = false;
     return true;
 }
 

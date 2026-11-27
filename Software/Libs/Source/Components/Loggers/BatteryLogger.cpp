@@ -32,6 +32,8 @@ const char* BatteryLogger::reasonToStr(Reason r)
         case Reason::POR:         return "por";
         case Reason::BOOT:        return "boot";
         case Reason::SHUTDOWN:    return "shutdown";
+        case Reason::DRIVE_OPEN:   return "drive_open";
+        case Reason::DRIVE_CLOSED: return "drive_closed";
     }
     return "unknown";
 }
@@ -125,6 +127,52 @@ void BatteryLogger::deinit()
     LOG_INFO("stopped\n");
 }
 
+bool BatteryLogger::suspend()
+{
+    if (mThread.getState() != OS::__Thread::State::Running) {
+        return false;
+    }
+
+    // Requests are handled in order, so this one is done once this many are.
+    // Counted before the push, so the worker never sees more handled than
+    // queued (suspend() is only called from one thread).
+    const uint32_t mine = ++mDriveOpenQueued;
+    constexpr uint32_t kTimeoutMs = 2000;
+    if (!mQueue.push(Reason::DRIVE_OPEN, kTimeoutMs)) {
+        --mDriveOpenQueued;
+        LOG_ERROR("suspend dropped (queue full)\n");
+        return false;
+    }
+
+    // A request that timed out earlier can be handled (and given) at any
+    // point, so each give only prompts another look at the count.
+    // FreeRTOS ticks, which wrap cleanly modulo 2^32 (GetTimeMs() does not).
+    const TickType_t start = xTaskGetTickCount();
+    while (static_cast<int32_t>(mDriveOpenDone.load() - mine) < 0) {
+        const uint32_t waited = (xTaskGetTickCount() - start) * portTICK_PERIOD_MS;
+        if (waited >= kTimeoutMs || !mDriveOpenHandled.take(kTimeoutMs - waited)) {
+            LOG_ERROR("suspend timed out\n");
+            return false;
+        }
+    }
+    return true;
+}
+
+void BatteryLogger::resume()
+{
+    if (mThread.getState() != OS::__Thread::State::Running) {
+        return;
+    }
+
+    // The flag, not the record, is what reopens the file: if the queue is full
+    // the record is lost, and the next record of any kind reopens it.
+    mReopenPending = true;
+    constexpr uint32_t kTimeoutMs = 2000;
+    if (!mQueue.push(Reason::DRIVE_CLOSED, kTimeoutMs)) {
+        LOG_WARNING("drive_closed record dropped (queue full)\n");
+    }
+}
+
 void BatteryLogger::onUsbDetected(bool state)
 {
     mQueue.push(state ? Reason::USB_ON : Reason::USB_OFF, 0);
@@ -181,7 +229,33 @@ void BatteryLogger::thread()
             continue;
         }
 
+        // Not while a DRIVE_OPEN is still queued or being handled: one whose
+        // suspend() timed out can come after the resume() that set the flag,
+        // and records ahead of it would take the flag, reopen the file, and
+        // leave it to that DRIVE_OPEN to close it with nothing to reopen it.
+        const bool driveOpenOutstanding =
+                mDriveOpenDone.load() != mDriveOpenQueued.load();
+        if (!driveOpenOutstanding && mReopenPending.exchange(false)) {
+            // Closed for DRIVE_OPEN, or left open with an object the volume's
+            // remount invalidated if that suspend failed: start a new file
+            // either way.
+            mLogger.close();
+            if (!mLogger.open()) {
+                // Owed still: the next record tries again (a periodic one at
+                // the latest), so a lasting failure logs once a period.
+                LOG_ERROR("Logger reopen failed\n");
+                mReopenPending = true;
+            }
+        }
+
         writeRecord(r);
+
+        if (r == Reason::DRIVE_OPEN) {
+            mLogger.close();
+            ++mDriveOpenDone;
+            mDriveOpenHandled.give();
+            continue;
+        }
 
         if (r == Reason::SHUTDOWN) {
             break;

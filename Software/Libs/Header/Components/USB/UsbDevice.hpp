@@ -11,8 +11,11 @@
 #ifndef __DRIVER_USB_DEVICE_HPP
 #define __DRIVER_USB_DEVICE_HPP
 
+#include <atomic>
 #include <cstdint>
 #include <cstdbool>
+#include <functional>
+#include <optional>
 
 #include "cmsis_os2.h"
 #include "FreeRTOS.h"
@@ -113,11 +116,37 @@ public:
      *          Can be called while USB is connected to PC - host will
      *          see a short reconnect and remount with new configuration.
      *          PHY and Sleep state are preserved across the call.
-     * @param   mscEnable: Enable Mass Storage class.
+     * @param   mscEnable: Enable Mass Storage class. Ignored (left off) when
+     *          no cable is attached, or when @p unplugsSeen is given and the
+     *          cable has been unplugged since (getUnplugCount() moved on).
      * @param   mscDisk: Mass Storage disk index.
+     * @param   unplugsSeen: getUnplugCount() as the caller last saw it, or
+     *          std::nullopt not to check.
      * @retval  true if success, false otherwise.
      */
-    bool reinit(bool mscEnable, uint8_t mscDisk);
+    bool reinit(bool mscEnable, uint8_t mscDisk,
+            std::optional<uint32_t> unplugsSeen = std::nullopt);
+
+    /**
+     * @brief   Take Mass Storage off if it is on, then run @p then, both under
+     *          the lock reinit() and onUsbDetected() take: no reinit() can
+     *          enable Mass Storage between the two. For taking back a volume
+     *          the host had.
+     * @param   then: Run once Mass Storage is off.
+     */
+    void disableMscThen(const std::function<void()>& then);
+
+    /**
+     * @brief   Unplugs fully reported: counted once every onDisconnect() for
+     *          them has returned. Pass it to reinit(), which compares it with
+     *          the unplugs detected (counted under its lock, before the
+     *          notify), so an unplug still being reported, or any later one,
+     *          leaves Mass Storage off.
+     */
+    uint32_t getUnplugCount() const
+    {
+        return mUnplugsReported.load();
+    }
 
     /**
      * @brief   Start USB stack (soft-connect).
@@ -233,6 +262,8 @@ private:
     bool                 mIsMscEnabled = false;
     uint8_t              mMscDisk      = 0;
     DriverUsb_PortType_t mPortType     = DRIVER_USB_PORT_NONE;
+    std::atomic<uint32_t> mUnplugs {0};           // detected, under the lock
+    std::atomic<uint32_t> mUnplugsReported {0};   // see getUnplugCount()
 
     osMutexId_t       mMutex {};
     StaticSemaphore_t mMutexControlBlock {};

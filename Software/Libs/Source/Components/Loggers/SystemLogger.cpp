@@ -158,6 +158,11 @@ bool SystemLogger::start()
         return true;
     }
 
+    if (!mLifecycle.init("SysLogLife")) {
+        LOG_ERROR("failed to create the lifecycle lock\n");
+        return false;
+    }
+
     // Validate/seed the no-init cursor. On a cold boot (or layout change) start
     // from the oldest byte still in the ring; otherwise keep the survived value.
     if (sCursor.magic != kCursorMagic) {
@@ -202,14 +207,98 @@ bool SystemLogger::start()
     return true;
 }
 
+bool SystemLogger::suspend()
+{
+    if (!mRunning) {
+        return true;    // never started: the lock is not set up either
+    }
+    OS::MutexCS cs(mLifecycle);
+    if (!mRunning) {
+        return true;
+    }
+
+    if (!mSuspended) {
+        LogBuffer::setNotify(nullptr, nullptr);
+        mSuspended = true;
+    }
+
+    // The writer drains the source before it closes, so everything logged up
+    // to here is written and the cursor committed. Once it has, this returns
+    // at once; called again after a timeout, it waits for the worker again.
+    if (!mWriter.stop()) {
+        // Stuck in a file call: left to finish. Until it has, it may still
+        // write, so the volume must not be handed over; resume() fails until
+        // then, and is tried again on the next close.
+        LOG_ERROR("writer still busy\n");
+        return false;
+    }
+    LOG_INFO("suspended\n");
+    return true;
+}
+
+bool SystemLogger::resume()
+{
+    if (!mRunning) {
+        return true;
+    }
+    OS::MutexCS cs(mLifecycle);
+    if (!mRunning || !mSuspended) {
+        return true;
+    }
+
+    // A worker a timed-out suspend() left busy could still roll over, taking
+    // the next segment name too, and the open below would overwrite what it
+    // wrote. Not before it has exited (at once after a normal suspend); the
+    // caller tries again on the next close.
+    if (!mWriter.stop(0)) {
+        LOG_ERROR("writer still busy at resume\n");
+        return false;
+    }
+
+    char path[128];
+    if (!mNaming.nextPath(path, sizeof(path))) {
+        LOG_ERROR("failed to build the next segment path\n");
+        return false;
+    }
+    if (!mWriter.start(path, true /* override */, skFlushIntervalMs)) {
+        LOG_ERROR("failed to restart the writer\n");
+        return false;
+    }
+
+    mSuspended = false;
+    LogBuffer::setNotify(&SystemLogger::notifyTrampoline, this);
+    mWriter.notifyData();   // kick: drain what was logged while suspended
+    LOG_INFO("resumed\n");
+    return true;
+}
+
 void SystemLogger::stop()
 {
+    if (!mRunning) {
+        return;
+    }
+    // A shutdown (Power) can stop the logger while the Backend suspends it.
+    OS::MutexCS cs(mLifecycle);
     if (!mRunning) {
         return;
     }
 
     LogBuffer::setNotify(nullptr, nullptr);
     mRunning = false;
+
+    if (mSuspended) {
+        // The writer was stopped for the drive. What was logged since stays in
+        // the LogBuffer, behind the persisted cursor. If that stop timed out
+        // the worker may still be in a file call: give it the stop timeout
+        // again to finish and close (at once if it has), as a power-off
+        // follows.
+        if (!mWriter.stop()) {
+            LOG_ERROR("writer still busy at stop\n");
+        }
+        mSuspended = false;
+        sStarted   = false;
+        return;
+    }
 
     // Ask the source to append a shutdown marker after the last data, then stop:
     // the writer's shutdown drain pulls the remaining buffer + marker, f_syncs
