@@ -68,6 +68,7 @@ void UsbDevice::onUsbDetected(bool state)
         }
         DriverUsb_PhyDisable();
         mPortType = DRIVER_USB_PORT_NONE;
+        ++mUnplugs;     // under the lock, before onDisconnect() is told
     }
 
     DriverUsb_PortType_t portType = mPortType;
@@ -213,7 +214,8 @@ bool UsbDevice::deinit()
     return true;
 }
 
-bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk)
+bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk,
+        std::optional<uint32_t> unplugsSeen)
 {
     if (!mIsInit) {
         return false;
@@ -229,6 +231,12 @@ bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk)
     // would take it off before a replug handed the host the volume.
     if (mscEnable && mPortType == DRIVER_USB_PORT_NONE) {
         LOG_WARNING("reinit: no cable, mass storage left off\n");
+        mscEnable = false;
+    }
+    // Likewise a cable pulled (and maybe replugged) since the caller looked:
+    // what the caller prepared for this host, the unplug may have undone.
+    if (mscEnable && unplugsSeen && *unplugsSeen != mUnplugs.load()) {
+        LOG_WARNING("reinit: unplugged since, mass storage left off\n");
         mscEnable = false;
     }
 

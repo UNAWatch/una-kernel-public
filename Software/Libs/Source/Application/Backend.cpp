@@ -1587,23 +1587,26 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
     // the same ones. The logs are closed first so nothing they hold is lost;
     // after release() any other access fails instead of writing.
     suspendFileLoggers();
-    const uint32_t unplugs = mUsbUnplugs.load();
+
+    // Read before the release: an unplug counts itself before its
+    // onDisconnect() takes the volume back, so if reinit() still sees this
+    // count (under the lock the unplug takes) the volume is still released,
+    // and an unplug after it finds mass storage on and takes it off first.
+    UsbDevice &usb = UsbDevice::GetInstance();
+    const uint32_t unplugs = usb.getUnplugCount();
     if (!FS::FileSystem::GetInstance().release(kUserVolume)) {
         LOG_ERROR("Volume busy; not opening MSD\n");
         guiHandler(G2BEvent::MsdClose{});
         return;
     }
 
-    UsbDevice::GetInstance().reinit(true, FLASH_DISK_USR);
+    usb.reinit(true, FLASH_DISK_USR, unplugs);
 
-    // Mass storage stayed off (the cable left before the enable), or an unplug
-    // since the release has taken the volume back and a replug let the enable
-    // through. Either way close now, as the unplug's close does: if that has
-    // run already nothing else would take the volume back or bring the logs
-    // and apps back, and in the second case mass storage comes off again long
-    // before a host can enumerate it. An unplug after this point finds mass
-    // storage on and takes it off before it takes the volume back.
-    if (!UsbDevice::GetInstance().isMscEnabled() || mUsbUnplugs.load() != unplugs) {
+    // Left off: the cable is out, or was pulled since the count was read. If
+    // the unplug's close has run already, nothing else would take the volume
+    // back or bring the logs and apps back until the next unplug: close now,
+    // as it does.
+    if (!usb.isMscEnabled()) {
         LOG_WARNING("MSD not opened: cable removed during the open\n");
         guiHandler(G2BEvent::MsdClose{});
         return;
@@ -2099,9 +2102,6 @@ void Backend::onDisconnect()
 {
     // A new plug-in opens the drive again.
     mMsdHeld = false;
-
-    // Before the reclaim below, so an open running meanwhile sees it.
-    ++mUsbUnplugs;
 
     // The cable is out, so the host can no longer reach the volume. Mass
     // storage comes off here, not in the MsdClose handler, so a replug before

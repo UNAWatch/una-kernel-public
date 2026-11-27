@@ -11,8 +11,10 @@
 #ifndef __DRIVER_USB_DEVICE_HPP
 #define __DRIVER_USB_DEVICE_HPP
 
+#include <atomic>
 #include <cstdint>
 #include <cstdbool>
+#include <optional>
 
 #include "cmsis_os2.h"
 #include "FreeRTOS.h"
@@ -114,11 +116,24 @@ public:
      *          see a short reconnect and remount with new configuration.
      *          PHY and Sleep state are preserved across the call.
      * @param   mscEnable: Enable Mass Storage class. Ignored (left off) when
-     *          no cable is attached.
+     *          no cable is attached, or when @p unplugsSeen is given and the
+     *          cable has been unplugged since (getUnplugCount() moved on).
      * @param   mscDisk: Mass Storage disk index.
+     * @param   unplugsSeen: getUnplugCount() as the caller last saw it, or
+     *          std::nullopt not to check.
      * @retval  true if success, false otherwise.
      */
-    bool reinit(bool mscEnable, uint8_t mscDisk);
+    bool reinit(bool mscEnable, uint8_t mscDisk,
+            std::optional<uint32_t> unplugsSeen = std::nullopt);
+
+    /**
+     * @brief   Unplugs seen so far. Counted under the lock reinit() takes,
+     *          before onDisconnect() is notified.
+     */
+    uint32_t getUnplugCount() const
+    {
+        return mUnplugs.load();
+    }
 
     /**
      * @brief   Start USB stack (soft-connect).
@@ -234,6 +249,7 @@ private:
     bool                 mIsMscEnabled = false;
     uint8_t              mMscDisk      = 0;
     DriverUsb_PortType_t mPortType     = DRIVER_USB_PORT_NONE;
+    std::atomic<uint32_t> mUnplugs {0};   // see getUnplugCount()
 
     osMutexId_t       mMutex {};
     StaticSemaphore_t mMutexControlBlock {};

@@ -422,10 +422,6 @@ private:
     bool mSystemLogSuspended = false;
     bool mBatteryLogSuspended = false;
 
-    /// Unplugs seen by onDisconnect() (USB task), so an MsdOpen can tell that
-    /// one took the volume back while it was opening the drive.
-    std::atomic<uint32_t> mUsbUnplugs {0};
-
     /// Reload the settings the host may have edited over the drive. Only once
     /// the host can no longer reach the volume.
     void reloadSettingsAfterMsd();
