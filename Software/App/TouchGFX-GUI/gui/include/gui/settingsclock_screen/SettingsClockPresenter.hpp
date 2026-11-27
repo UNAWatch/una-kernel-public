@@ -32,6 +32,9 @@ public:
     /** @brief Choose which value the shared FORMAT picker edits (time vs date). */
     void setClockPickerDate(bool date) { model->setClockPickerDate(date); }
 
+    /** @brief Persist the selected timezone/DST preset. */
+    void saveTimeZone(WatchSettingsLocal::Clock::TimeZone tz);
+
 private:
     SettingsClockPresenter();
 

@@ -5,6 +5,42 @@ SettingsClockView::SettingsClockView()
 
 }
 
+namespace {
+const char* tzPresetLabel(WatchSettingsLocal::Clock::TimeZone tz)
+{
+    using TZ = WatchSettingsLocal::Clock::TimeZone;
+    switch (tz) {
+        case TZ::TZ_CET:        return "CET DST";
+        case TZ::TZ_UK:         return "UK DST";
+        case TZ::TZ_EET:        return "EET DST";
+        case TZ::TZ_UTC:        return "UTC";
+        case TZ::TZ_UTC_PLUS_1: return "UTC+1";
+        case TZ::TZ_UTC_PLUS_2: return "UTC+2";
+        case TZ::TZ_EST:        return "EST DST";
+        case TZ::TZ_PST:        return "PST DST";
+        case TZ::TZ_AUTO_BLE:
+        default:                return "AUTO";
+    }
+}
+} // namespace
+
+void SettingsClockView::setTimeZone(WatchSettingsLocal::Clock::TimeZone tz)
+{
+    mTimeZone = tz;
+
+    const size_t maxLen = sizeof(mTzTipBuf) / sizeof(mTzTipBuf[0]);
+    touchgfx::Unicode::strncpy(mTzTipBuf, tzPresetLabel(mTimeZone), maxLen - 1);
+    mTzTipBuf[maxLen - 1] = 0;
+
+    MenuItemSelected *pS = menu.getSelectedItem(Gui::Config::Menu::Top::Settings::Clock::ID_TIMEZONE);
+    MenuItemNotSelected *pN = menu.getNotSelectedItem(Gui::Config::Menu::Top::Settings::Clock::ID_TIMEZONE);
+
+    pS->configTip(T_TEXT_TIME, mTzTipBuf);
+    pN->configTip(T_TEXT_TIME, mTzTipBuf);
+
+    menu.invalidate();
+}
+
 void SettingsClockView::setupScreen()
 {
     SettingsClockViewBase::setupScreen();
@@ -19,6 +55,7 @@ void SettingsClockView::setupScreen()
     // configured by setFormat() / setDateOrder().
     setFormat(mFormat);
     setDateOrder(mDateOrder);
+    setTimeZone(mTimeZone);
 }
 
 void SettingsClockView::tearDownScreen()
@@ -95,6 +132,18 @@ void SettingsClockView::handleKeyEvent(uint8_t key)
                 presenter->setClockPickerDate(true);
                 application().gotoSettingsClockFormatScreenNoTransition();
                 break;
+            
+            /* each press cycles to the next timezone preset, 
+            updates the row immediately, and persists it*/
+
+            case Gui::Config::Menu::Top::Settings::Clock::ID_TIMEZONE:
+            {
+                using TZ = WatchSettingsLocal::Clock::TimeZone;
+                const auto next = static_cast<TZ>((static_cast<uint8_t>(mTimeZone) + 1) % TZ::TZ_COUNT);
+                setTimeZone(next);
+                presenter->saveTimeZone(next);
+                break;
+            }
             default:
                 break;
         };

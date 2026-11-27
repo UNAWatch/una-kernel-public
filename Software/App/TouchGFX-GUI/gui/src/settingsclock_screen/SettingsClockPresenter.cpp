@@ -17,6 +17,14 @@ void SettingsClockPresenter::activate()
 
     view.setFormat(model->getLocalSettings().clock.format);
     view.setDateOrder(model->getLocalSettings().clock.dateOrder);
+    view.setTimeZone(model->getLocalSettings().clock.timeZone);
+}
+
+void SettingsClockPresenter::saveTimeZone(WatchSettingsLocal::Clock::TimeZone tz)
+{
+    WatchSettingsLocal sett = model->getLocalSettings();
+    sett.clock.timeZone = tz;
+    model->saveLocalSettings(sett);
 }
 
 void SettingsClockPresenter::deactivate()

@@ -207,7 +207,7 @@ enum Id {
     // and bring its toggle item back in the view and the presenter.
     ID_TIME_FORMAT = 0,
     ID_DATE_FORMAT,
-
+    ID_TIMEZONE, 
     ID_COUNT,   // Number of items in the clock settings menu
     ID_DEFAULT = ID_TIME_FORMAT,
 };
