@@ -1587,6 +1587,7 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
     // the same ones. The logs are closed first so nothing they hold is lost;
     // after release() any other access fails instead of writing.
     suspendFileLoggers();
+    const uint32_t unplugs = mUsbUnplugs.load();
     if (!FS::FileSystem::GetInstance().release(kUserVolume)) {
         LOG_ERROR("Volume busy; not opening MSD\n");
         guiHandler(G2BEvent::MsdClose{});
@@ -1595,12 +1596,15 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
 
     UsbDevice::GetInstance().reinit(true, FLASH_DISK_USR);
 
-    // The cable left before the enable, so mass storage stayed off and the
-    // host cannot reach the volume. If the unplug's close has run already,
-    // nothing else would take the volume back or bring the logs and apps back
-    // until the next unplug: close now, as it does.
-    if (!UsbDevice::GetInstance().isMscEnabled()) {
-        LOG_WARNING("MSD not opened: no cable\n");
+    // Mass storage stayed off (the cable left before the enable), or an unplug
+    // since the release has taken the volume back and a replug let the enable
+    // through. Either way close now, as the unplug's close does: if that has
+    // run already nothing else would take the volume back or bring the logs
+    // and apps back, and in the second case mass storage comes off again long
+    // before a host can enumerate it. An unplug after this point finds mass
+    // storage on and takes it off before it takes the volume back.
+    if (!UsbDevice::GetInstance().isMscEnabled() || mUsbUnplugs.load() != unplugs) {
+        LOG_WARNING("MSD not opened: cable removed during the open\n");
         guiHandler(G2BEvent::MsdClose{});
         return;
     }
@@ -2096,6 +2100,9 @@ void Backend::onDisconnect()
     // A new plug-in opens the drive again.
     mMsdHeld = false;
 
+    // Before the reclaim below, so an open running meanwhile sees it.
+    ++mUsbUnplugs;
+
     // The cable is out, so the host can no longer reach the volume. Mass
     // storage comes off here, not in the MsdClose handler, so a replug before
     // that runs cannot hand the host the volume taken back below. USB is
@@ -2191,33 +2198,34 @@ void Backend::guiHandler(const G2BEvent::UsbReopenSet &evt)
 
 void Backend::suspendFileLoggers()
 {
-    if (mFileLoggersSuspended) {
-        return;
-    }
-    mFileLoggersSuspended = true;
-
-    if (Component::SystemLogger::isStarted()) {
+    // A log still suspended from a resume that failed stays as it is.
+    if (!mSystemLogSuspended && Component::SystemLogger::isStarted()) {
         Component::SystemLogger::GetInstance().suspend();
+        mSystemLogSuspended = true;
     }
-    // A failed suspend leaves the file open: its writes fail while the host
-    // has the volume, and resume() starts a new file regardless.
-    if (mBatteryLogger && !mBatteryLogger->suspend()) {
-        LOG_WARNING("Battery log not closed for the drive\n");
+    if (!mBatteryLogSuspended && mBatteryLogger) {
+        // A failed suspend leaves the file open: its writes fail while the
+        // host has the volume, and resume() starts a new file regardless.
+        if (!mBatteryLogger->suspend()) {
+            LOG_WARNING("Battery log not closed for the drive\n");
+        }
+        mBatteryLogSuspended = true;
     }
 }
 
 void Backend::resumeFileLoggers()
 {
-    if (!mFileLoggersSuspended) {
-        return;
+    if (mSystemLogSuspended) {
+        // Kept set on failure, so the next close (any unplug) tries again.
+        mSystemLogSuspended = Component::SystemLogger::isStarted()
+                && !Component::SystemLogger::GetInstance().resume();
     }
-    mFileLoggersSuspended = false;
-
-    if (Component::SystemLogger::isStarted()) {
-        Component::SystemLogger::GetInstance().resume();
-    }
-    if (mBatteryLogger) {
-        mBatteryLogger->resume();
+    if (mBatteryLogSuspended) {
+        // Never fails here: the worker keeps a reopen owed until it works.
+        mBatteryLogSuspended = false;
+        if (mBatteryLogger) {
+            mBatteryLogger->resume();
+        }
     }
 }
 

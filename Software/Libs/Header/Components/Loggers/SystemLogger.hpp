@@ -46,8 +46,13 @@ public:
      */
     void suspend();
 
-    /** @brief Carry on draining into a new segment of the session. */
-    void resume();
+    /**
+     * @brief Carry on draining into a new segment of the session.
+     * @return false if the segment could not be named or the writer not
+     *         restarted (still suspended: call again); true otherwise,
+     *         including when there was nothing to resume.
+     */
+    bool resume();
 
     bool isRunning() const { return mRunning; }
 

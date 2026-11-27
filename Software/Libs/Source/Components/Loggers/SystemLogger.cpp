@@ -226,30 +226,31 @@ void SystemLogger::suspend()
     LOG_INFO("suspended\n");
 }
 
-void SystemLogger::resume()
+bool SystemLogger::resume()
 {
     if (!mRunning) {
-        return;
+        return true;
     }
     OS::MutexCS cs(mLifecycle);
     if (!mRunning || !mSuspended) {
-        return;
+        return true;
     }
 
     char path[128];
     if (!mNaming.nextPath(path, sizeof(path))) {
         LOG_ERROR("failed to build the next segment path\n");
-        return;
+        return false;
     }
     if (!mWriter.start(path, true /* override */, skFlushIntervalMs)) {
         LOG_ERROR("failed to restart the writer\n");
-        return;
+        return false;
     }
 
     mSuspended = false;
     LogBuffer::setNotify(&SystemLogger::notifyTrampoline, this);
     mWriter.notifyData();   // kick: drain what was logged while suspended
     LOG_INFO("resumed\n");
+    return true;
 }
 
 void SystemLogger::stop()

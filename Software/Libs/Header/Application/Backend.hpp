@@ -416,9 +416,15 @@ private:
     /// Set by the UsbReopenSet handler, read by the CLI thread.
     std::atomic<ReopenResult> mReopenResult {ReopenResult::Saved};
 
-    /// The system and battery loggers were suspended for the drive and not
-    /// resumed yet. Backend thread only.
-    bool mFileLoggersSuspended = false;
+    /// The system log / the battery log was suspended for the drive and not
+    /// resumed yet. Each stays set until its resume succeeds, so the next close
+    /// tries again. Backend thread only.
+    bool mSystemLogSuspended = false;
+    bool mBatteryLogSuspended = false;
+
+    /// Unplugs seen by onDisconnect() (USB task), so an MsdOpen can tell that
+    /// one took the volume back while it was opening the drive.
+    std::atomic<uint32_t> mUsbUnplugs {0};
 
     /// Reload the settings the host may have edited over the drive. Only once
     /// the host can no longer reach the volume.
