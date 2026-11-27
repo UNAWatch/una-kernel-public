@@ -278,8 +278,14 @@ void SystemLogger::stop()
     mRunning = false;
 
     if (mSuspended) {
-        // The writer is stopped and its file closed already. What was logged
-        // since stays in the LogBuffer, behind the persisted cursor.
+        // The writer was stopped for the drive. What was logged since stays in
+        // the LogBuffer, behind the persisted cursor. If that stop timed out
+        // the worker may still be in a file call: give it the stop timeout
+        // again to finish and close (at once if it has), as a power-off
+        // follows.
+        if (!mWriter.stop()) {
+            LOG_ERROR("writer still busy at stop\n");
+        }
         mSuspended = false;
         sStarted   = false;
         return;

@@ -71,6 +71,13 @@ bool CSVLogger::open()
         return true;
     }
 
+    // A close() that timed out left its worker to finish, and it uses the
+    // naming and callback configured below: not before it has. Returns at
+    // once either way; the caller tries again later.
+    if (!mWriter.stop(0)) {
+        return false;
+    }
+
     mWriter.configure(mDir, mBase, mId, "csv", mKeepNewest, mMaxFileBytes,
                       mFlushIntervalMs);
     mWriter.onSegmentOpened([this] { writeHeader(); });

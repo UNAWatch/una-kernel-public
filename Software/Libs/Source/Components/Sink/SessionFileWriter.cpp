@@ -48,9 +48,9 @@ bool SessionFileWriter::start()
     return mWriter.start(mFirstPath, true /* override */, mFlushIntervalMs);
 }
 
-bool SessionFileWriter::stop()
+bool SessionFileWriter::stop(uint32_t timeoutMs)
 {
-    return mWriter.stop();
+    return mWriter.stop(timeoutMs);
 }
 
 }  // namespace Sink

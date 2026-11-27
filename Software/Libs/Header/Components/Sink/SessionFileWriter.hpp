@@ -33,7 +33,9 @@ public:
     using SegmentOpenedCb = std::function<void()>;
 
     SessionFileWriter()  = default;
-    ~SessionFileWriter() { stop(); }
+    // However long it takes, and here rather than in mWriter's own destructor:
+    // the worker uses mNaming and mOnSegmentOpened, destroyed before mWriter.
+    ~SessionFileWriter() { stop(AsyncFileWriter::kWaitForever); }
 
     SessionFileWriter(const SessionFileWriter&)            = delete;
     SessionFileWriter& operator=(const SessionFileWriter&) = delete;
@@ -60,7 +62,9 @@ public:
     void onSegmentOpened(SegmentOpenedCb cb) { mOnSegmentOpened = std::move(cb); }
 
     bool start();                                  ///< Prune + open the first session.
-    bool stop();                                   ///< Close the current session.
+    /// Close the current session. See AsyncFileWriter::stop(): false if the
+    /// worker is still busy after @p timeoutMs (left to finish).
+    bool stop(uint32_t timeoutMs = 5000);
     bool isRunning() const { return mWriter.isRunning(); }
 
     bool write(const void* data, size_t size) { return mWriter.write(data, size); }
