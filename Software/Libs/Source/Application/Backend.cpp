@@ -1588,10 +1588,11 @@ void Backend::guiHandler(const G2BEvent::MsdOpen &evt)
     // after release() any other access fails instead of writing.
     suspendFileLoggers();
 
-    // Read before the release: an unplug counts itself before its
-    // onDisconnect() takes the volume back, so if reinit() still sees this
-    // count (under the lock the unplug takes) the volume is still released,
-    // and an unplug after it finds mass storage on and takes it off first.
+    // Read before the release. It counts only unplugs whose onDisconnect() has
+    // returned, and reinit() compares it with every unplug detected (under the
+    // lock the unplug takes, before the notify): so one still being reported
+    // now, or any later one, leaves mass storage off, and an unplug after the
+    // enable finds it on and takes it off before taking the volume back.
     UsbDevice &usb = UsbDevice::GetInstance();
     const uint32_t unplugs = usb.getUnplugCount();
     if (!FS::FileSystem::GetInstance().release(kUserVolume)) {
@@ -1621,11 +1622,9 @@ void Backend::guiHandler(const G2BEvent::MsdClose &evt)
     // back already. This covers an open handled after the unplug that posted
     // this close, and an open that gave up: mass storage first, so the host
     // cannot reach the volume once it is taken back. Done again it would
-    // re-enumerate the device, hence the check.
-    if (UsbDevice::GetInstance().isMscEnabled()) {
-        UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
-    }
-    FS::FileSystem::GetInstance().reclaim(kUserVolume);
+    // re-enumerate the device, so only if it is on.
+    UsbDevice::GetInstance().disableMscThen(
+            [] { FS::FileSystem::GetInstance().reclaim(kUserVolume); });
     resumeFileLoggers();
 
     DailyHealth::Service& dhm = Instance::DailyHealthService::getInstance().getService();
@@ -2106,11 +2105,12 @@ void Backend::onDisconnect()
     // The cable is out, so the host can no longer reach the volume. Mass
     // storage comes off here, not in the MsdClose handler, so a replug before
     // that runs cannot hand the host the volume taken back below. USB is
-    // stopped, so this is a light reinit.
-    if (UsbDevice::GetInstance().isMscEnabled()) {
-        UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
-    }
-    FS::FileSystem::GetInstance().reclaim(kUserVolume);
+    // stopped, so this is a light reinit. Both under the USB lock: this runs
+    // on the thread that reported the unplug, and a replug reported on another
+    // (a USB protection fault clearing) must not let an open enable mass
+    // storage between the two.
+    UsbDevice::GetInstance().disableMscThen(
+            [] { FS::FileSystem::GetInstance().reclaim(kUserVolume); });
     reloadSettingsAfterMsd();
 
     // Last, because the handler brings the apps back and runs on another
@@ -2160,8 +2160,8 @@ void Backend::guiHandler(const G2BEvent::MsdCloseByHand &evt)
     // Take the drive from the host first, as pulling the cable does, so the
     // reload and the apps below cannot write the volume while the host still
     // has it. The host configuring the device again finds mMsdHeld set.
-    UsbDevice::GetInstance().reinit(false, FLASH_DISK_USR);
-    FS::FileSystem::GetInstance().reclaim(kUserVolume);
+    UsbDevice::GetInstance().disableMscThen(
+            [] { FS::FileSystem::GetInstance().reclaim(kUserVolume); });
 
     reloadSettingsAfterMsd();
 

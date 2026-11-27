@@ -97,6 +97,9 @@ void UsbDevice::onUsbDetected(bool state)
         }
     } else {
         mObserver.notify(&Callback::onDisconnect);
+        // Only now: until the observers have taken back what the host had,
+        // reinit() must not count this unplug as dealt with.
+        ++mUnplugsReported;
     }
 }
 
@@ -214,6 +217,21 @@ bool UsbDevice::deinit()
     return true;
 }
 
+void UsbDevice::disableMscThen(const std::function<void()>& then)
+{
+    // The lock is recursive, so reinit() can take it again inside.
+    const bool locked = lock();
+    if (mIsMscEnabled) {
+        reinit(false, mMscDisk);
+    }
+    if (then) {
+        then();
+    }
+    if (locked) {
+        unlock();
+    }
+}
+
 bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk,
         std::optional<uint32_t> unplugsSeen)
 {
@@ -233,8 +251,10 @@ bool UsbDevice::reinit(bool mscEnable, uint8_t mscDisk,
         LOG_WARNING("reinit: no cable, mass storage left off\n");
         mscEnable = false;
     }
-    // Likewise a cable pulled (and maybe replugged) since the caller looked:
-    // what the caller prepared for this host, the unplug may have undone.
+    // Likewise a cable pulled (and maybe replugged) since the caller looked,
+    // or still being reported when it looked (getUnplugCount() counts only
+    // reported ones): what the caller prepared for this host, the unplug may
+    // have undone.
     if (mscEnable && unplugsSeen && *unplugsSeen != mUnplugs.load()) {
         LOG_WARNING("reinit: unplugged since, mass storage left off\n");
         mscEnable = false;
