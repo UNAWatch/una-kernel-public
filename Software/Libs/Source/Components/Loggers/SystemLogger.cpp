@@ -246,6 +246,15 @@ bool SystemLogger::resume()
         return true;
     }
 
+    // A worker a timed-out suspend() left busy could still roll over, taking
+    // the next segment name too, and the open below would overwrite what it
+    // wrote. Not before it has exited (at once after a normal suspend); the
+    // caller tries again on the next close.
+    if (!mWriter.stop(0)) {
+        LOG_ERROR("writer still busy at resume\n");
+        return false;
+    }
+
     char path[128];
     if (!mNaming.nextPath(path, sizeof(path))) {
         LOG_ERROR("failed to build the next segment path\n");
