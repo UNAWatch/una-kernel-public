@@ -222,7 +222,13 @@ void SystemLogger::suspend()
 
     // The writer drains the source before it closes, so everything logged up
     // to here is written and the cursor committed.
-    mWriter.stop();
+    if (!mWriter.stop()) {
+        // Stuck in a file call, maybe holding the volume lock: left to finish
+        // (release() cannot take the volume from it meanwhile), and resume()
+        // fails until it has, to be tried again on the next close.
+        LOG_ERROR("writer still busy; suspended without it finishing\n");
+        return;
+    }
     LOG_INFO("suspended\n");
 }
 

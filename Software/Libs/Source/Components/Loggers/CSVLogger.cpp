@@ -96,11 +96,14 @@ bool CSVLogger::isOpened()
 
 bool CSVLogger::close()
 {
+    bool ok = true;
     if (mOpened) {
-        mWriter.stop();
+        // False: the worker is still in a stalled file call, and open() fails
+        // until it has finished.
+        ok = mWriter.stop();
         mOpened = false;
     }
-    return true;
+    return ok;
 }
 
 /**

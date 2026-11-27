@@ -84,8 +84,23 @@ public:
      */
     bool start(const char* path, bool override = true, uint32_t flushIntervalMs = 0);
 
-    /** @brief Stop the worker, flushing and closing the file cleanly. */
-    bool stop();
+    /// stop() timeout that waits for as long as the worker takes.
+    static constexpr uint32_t kWaitForever = UINT32_MAX;
+
+    /**
+     * @brief Stop the worker, flushing and closing the file cleanly.
+     *
+     * A worker still busy after @p timeoutMs (a file system call that stalls)
+     * is left to finish, never killed: it may hold the FatFs volume lock, and a
+     * deleted task never gives a mutex back. It exits once that call returns.
+     * Until then start() fails, and a later stop() waits for it again.
+     *
+     * @param timeoutMs How long to wait for the worker; kWaitForever (as the
+     *                  destructors use, as the worker uses the object) waits
+     *                  until it has finished.
+     * @return true once the worker has finished, false if it is still busy.
+     */
+    bool stop(uint32_t timeoutMs = 5000);
 
     bool isRunning() const;
 
@@ -159,6 +174,7 @@ private:
     uint32_t mMaxSegmentBytes = 0;
     uint32_t mBytesInSegment  = 0;
     bool     mOverride        = true;
+    bool     mStopPending     = false;   // a stop() timed out; the worker may still run
 };
 
 }  // namespace Sink

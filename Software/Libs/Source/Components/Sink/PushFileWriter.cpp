@@ -22,7 +22,8 @@ PushFileWriter::~PushFileWriter()
 {
     // Stop the worker before our stream buffer is torn down (and before the base
     // destructor, so produce() is never dispatched on a half-destroyed object).
-    stop();
+    // However long it takes: a worker left running would use freed memory.
+    stop(kWaitForever);
     mStreamBuffer.deinit();
 }
 
